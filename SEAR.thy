@@ -118,7 +118,16 @@ syntax
 translations
   "\<iota>set X | P" \<rightleftharpoons> "CONST the_set (\<lambda>X. P)"
   "\<iota>elem x \<in> X | Q" \<rightleftharpoons> "CONST the_elem X (\<lambda>x. Q)"
-  "\<iota>rel \<phi>: A \<succ> B | R" \<rightleftharpoons> "CONST the_rel A B (\<lambda>\<phi>. R)" 
+  "\<iota>rel \<phi>: A \<succ> B | R" \<rightleftharpoons> "CONST the_rel A B (\<lambda>\<phi>. R)"
+
+
+subsubsection \<open>Indefinite description for sets\<close>
+
+axiomatization some_set :: "(set \<Rightarrow> o) \<Rightarrow> set" where
+  some_set_def: "\<exists>X. P X \<Longrightarrow> P (some_set P)"
+
+syntax "_some_set" :: "[set, o] \<Rightarrow> set" ("(\<epsilon>set _ | _)")
+translations "\<epsilon>set X | P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)"
 
 
 subsubsection \<open>Functions\<close>
@@ -173,9 +182,9 @@ corollary tab_minimal:
   using tabulation by blast
 
 
-subsection \<open>Basic consequences of the first three axioms\<close>
+section \<open>Basic consequences of the first three axioms\<close>
 
-theorem emptyset: "\<exists>X. \<forall>x \<in> X. x \<notin> X"
+theorem emptyset_exists: "\<exists>X. \<forall>x \<in> X. x \<notin> X"
 proof -
   from existence obtain a A where "a \<in> A" by auto
 
@@ -212,8 +221,7 @@ proof -
   thus ?thesis ..
 qed
 
-
-theorem singleton: "\<exists>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
+theorem singleton_exists: "\<exists>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
 proof -
   from existence obtain a A where
     a_in_A: "a \<in> A" by auto
@@ -247,5 +255,30 @@ proof -
   thus ?thesis using r_elem by auto
 qed
 
+text \<open>Fix particular choices of empty and singleton set.\<close>
+
+definition emptyset :: set ("\<emptyset>")
+  where "\<emptyset> \<equiv> \<epsilon>set X | \<forall>x \<in> X. x \<notin> X"
+
+definition singleton :: set ("\<one>")
+  where "\<one> \<equiv> \<epsilon>set X | \<exists>x \<in> X. \<forall>y \<in> X. y = x"
+
+theorem emptyset_prop: "\<forall>x \<in> \<emptyset>. x \<notin> \<emptyset>"
+  using emptyset_exists emptyset_def some_set_def [of "\<lambda>X. \<forall>x \<in> X. x \<notin> X"]
+  by auto
+
+theorem singleton_prop: "\<exists>x \<in> \<one>. \<forall>y \<in> \<one>. y = x"
+  using singleton_exists singleton_def some_set_def [of "\<lambda>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"]
+  by auto
+
+lemma vacuous: "\<forall>x \<in> \<emptyset>. P x"
+proof -
+  { fix x assume assm: "x \<in> \<emptyset>"
+    hence "x \<notin> \<emptyset>" using emptyset_prop by auto
+    hence "P x" using assm by auto
+  }
+  thus ?thesis by auto
+qed    
+  
 
 end
