@@ -142,15 +142,7 @@ translations
   "\<iota>rel \<phi>: A \<succ> B | R" \<rightleftharpoons> "CONST the_rel A B (\<lambda>\<phi>. R)"
 
 
-section \<open>Axioms\<close>
-
-axiomatization where
-
-  existence: "\<exists>X. \<exists>x: X. x \<in> X" and
-
-  comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x: A. \<forall>y: B. \<phi>(x, y) \<longleftrightarrow> P x y"
-
-text \<open>To state the third axiom we first define functions.\<close>
+subsubsection \<open>Functions\<close>
 
 abbreviation (input) is_func :: "[rel, set, set] \<Rightarrow> o" ("(_ : _ \<rightarrow> _)" [41, 0, 41] 40)
   where "\<phi>: A \<rightarrow> B \<equiv> \<phi>: A \<succ> B \<and> (\<forall>x: A. x \<in> A \<longrightarrow> (\<exists>!y: B. \<phi>(x, y)))"
@@ -158,7 +150,7 @@ abbreviation (input) is_func :: "[rel, set, set] \<Rightarrow> o" ("(_ : _ \<rig
 axiomatization func_app :: "[rel, elem] \<Rightarrow> elem" ("(_'(_'))" [100, 0])
   where func_app_def: "\<phi>: A \<succ> B \<Longrightarrow> \<phi>(x) \<equiv> \<iota>elem y: B | \<phi>(x, y)"
 
-lemma
+lemma func_image:
   assumes "\<phi>: A \<rightarrow> B" and "x \<in> A" 
   shows "\<phi>(x, \<phi>(x))"
 proof (subst func_app_def)
@@ -166,15 +158,30 @@ proof (subst func_app_def)
   proof (rule the_elem_def, auto simp: assms)
     from assms(1) have "\<forall>\<forall>x. x \<in> A \<longrightarrow> (\<exists>!y: B. \<phi>(x, y))"
       using all_elem_of_simp[of A "\<lambda>x. \<exists>!y: B. \<phi>(x, y)"] by auto
-    with assms(2) have lem1: "\<exists>!y: B. \<phi>(x, y)" by auto
+    with assms(2) have
+      unique_image: "\<exists>!y: B. \<phi>(x, y)" by auto
     thus "\<exists>y: B. \<phi>(x, y)" by auto
 
     fix y y' assume "y: B" "y': B" "\<phi>(x, y)" "\<phi>(x, y')"
-    thus "y = y'" using lem1 by auto
+    thus "y = y'" using unique_image by auto
   qed
 
   show "\<phi>: A \<succ> B" using assms(1) by auto
 qed
+
+lemma func_image_sort:
+  assumes "\<phi>: A \<rightarrow> B" and "x \<in> A" 
+  shows "(\<phi>::rel)(x): B"
+  using assms func_image holds_codom_sort by blast
+
+
+section \<open>Axioms\<close>
+
+axiomatization where
+
+  existence: "\<exists>X. \<exists>x: X. x \<in> X" and
+
+  comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x: A. \<forall>y: B. \<phi>(x, y) \<longleftrightarrow> P x y"
 
 axiomatization
   tab :: "rel \<Rightarrow> set" ("|_|") and
@@ -189,23 +196,56 @@ axiomatization
       (\<forall>r: |\<phi>|. \<forall>s: |\<phi>|. |\<phi>|\<^sub>1(r) = |\<phi>|\<^sub>1(s) \<and> |\<phi>|\<^sub>2(r) = |\<phi>|\<^sub>2(s) \<longrightarrow> r = s)"
 
 corollary fst_is_func: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>1: |\<phi>| \<rightarrow> A" using tabulation by auto
+
 corollary snd_is_func: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>2: |\<phi>| \<rightarrow> B" using tabulation by auto
-corollary 
+
+corollary tab_sufficiency:
+  "\<phi>: A \<succ> B \<Longrightarrow> \<forall>x: A. \<forall>y: B. \<phi>(x, y) \<longleftrightarrow> (\<exists>r: |\<phi>|. |\<phi>|\<^sub>1(r) = x \<and> |\<phi>|\<^sub>2(r) = y)"
+  using tabulation by auto
+
+corollary tab_minimality:
+  "\<phi>: A \<succ> B \<Longrightarrow> \<forall>r: |\<phi>|. \<forall>s: |\<phi>|. |\<phi>|\<^sub>1(r) = |\<phi>|\<^sub>1(s) \<and> |\<phi>|\<^sub>2(r) = |\<phi>|\<^sub>2(s) \<longrightarrow> r = s"
+  using tabulation by blast
 
 
-subsection \<open>Basic consequences of the axioms\<close>
+subsection \<open>Basic consequences of the first three axioms\<close>
 
 theorem emptyset: "\<exists>X. \<forall>x: X. x \<notin> X"
 proof -
-  from existence
-    obtain a A where "a \<in> A" by auto
-  from comprehension[of A A "\<lambda>_ _. False"]
-    obtain \<phi> where
-    "\<phi>: A \<succ> A" and
-    "\<forall>x: A. \<forall>y: A. \<not>\<phi>(x, y)"
-    by auto
-  with tabulation[of A A]
-    have 
+  from existence obtain a A where "a \<in> A" by auto
+
+  from comprehension[of A A "\<lambda>_ _. False"] obtain \<phi> where
+    \<phi>_sort: "\<phi>: A \<succ> A" and "\<forall>x: A. \<forall>y: A. \<not>\<phi>(x, y)"
+      by auto
+  with tab_sufficiency have
+    lemma_1: "\<forall>x: A. \<forall>y: A. \<not>(\<exists>r: |\<phi>|. |\<phi>|\<^sub>1(r) = x \<and> |\<phi>|\<^sub>2(r) = y)"
+      by auto
+
+  have "\<forall>r: |\<phi>|. r \<notin> |\<phi>|"
+  proof -
+    {
+    fix r assume r_sort: "r: |\<phi>|"
+
+    assume for_contradiction: "r \<in> |\<phi>|"
+    then have "|\<phi>|\<^sub>1(r): A" and "|\<phi>|\<^sub>2(r): A"
+      using
+        fst_is_func[of \<phi>, OF \<phi>_sort]
+        snd_is_func[of \<phi>, OF \<phi>_sort]
+        func_image_sort
+      by auto
+    hence nonexistence: "\<not>(\<exists>r': |\<phi>|. |\<phi>|\<^sub>1(r') = |\<phi>|\<^sub>1(r) \<and> |\<phi>|\<^sub>2(r') = |\<phi>|\<^sub>2(r))"
+      using lemma_1 by auto
+
+    from r_sort have
+      "\<exists>r': |\<phi>|. |\<phi>|\<^sub>1(r') = |\<phi>|\<^sub>1(r) \<and> |\<phi>|\<^sub>2(r') = |\<phi>|\<^sub>2(r)"
+        by auto
+    hence False using nonexistence by auto
+    }
+    thus "\<forall>x: |\<phi>|. x \<notin> |\<phi>|" by auto
+  qed
+
+  thus ?thesis by auto
+qed
 
 
 end
