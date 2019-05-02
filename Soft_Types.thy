@@ -41,6 +41,8 @@ syntax
 translations
   "(x : A) \<Rightarrow> B" \<rightleftharpoons> "CONST Pi_type A (\<lambda>x. B)"
 
+abbreviation "telescope_nondep" (infixr "\<Rightarrow>" 50)
+  where "A \<Rightarrow> B \<equiv> (_: A) \<Rightarrow> B"
 
 lemma Pi_typeI:
   assumes "\<And>x. x ::: A \<Longrightarrow> f x ::: B x"
