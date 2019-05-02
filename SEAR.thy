@@ -132,7 +132,7 @@ axiomatization func_app :: "[rel, elem] \<Rightarrow> elem" ("(_'(_'))" [100, 0]
 lemma func_image:
   assumes "\<phi>: A \<rightarrow> B" and "x \<in> A" 
   shows "\<phi>(x, \<phi>(x))"
-  by (simp add: func_app_def[OF assms(1)]) (auto simp: assms the_elem_sat)
+  by (simp add: func_app_def [OF assms(1)]) (auto simp: assms the_elem_sat)
 
 lemma func_image_sort:
   assumes "\<phi>: A \<rightarrow> B" and "x \<in> A" 
@@ -179,8 +179,8 @@ theorem emptyset: "\<exists>X. \<forall>x \<in> X. x \<notin> X"
 proof -
   from existence obtain a A where "a \<in> A" by auto
 
-  from comprehension[of A A "\<lambda>_ _. False"] obtain \<phi> where
-    \<phi>_sort: "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<not>\<phi>(x, y)"
+  from comprehension [of A A "\<lambda>_ _. False"] obtain \<phi> where
+    \<phi>_rel: "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<not>\<phi>(x, y)"
       by auto
   with tab_sufficient have
     lemma_1: "\<forall>x \<in> A. \<forall>y \<in> A. \<not>(\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1(r) = x \<and> |\<phi>|\<^sub>2(r) = y)"
@@ -191,20 +191,23 @@ proof -
     { fix r assume for_contradiction: "r \<in> |\<phi>|"
       then have "|\<phi>|\<^sub>1(r) \<in> A" and "|\<phi>|\<^sub>2(r) \<in> A"
         using
-          fst_is_func[of \<phi>, OF \<phi>_sort]
-          snd_is_func[of \<phi>, OF \<phi>_sort]
+          fst_is_func [OF \<phi>_rel]
+          snd_is_func [OF \<phi>_rel]
           func_image_sort
         by auto
-      hence nonexistence: "\<not>(\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1(r') = |\<phi>|\<^sub>1(r) \<and> |\<phi>|\<^sub>2(r') = |\<phi>|\<^sub>2(r))"
+      hence
+        nonexistence: "\<not>(\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1(r') = |\<phi>|\<^sub>1(r) \<and> |\<phi>|\<^sub>2(r') = |\<phi>|\<^sub>2(r))"
         using lemma_1 by auto
 
       from for_contradiction have
         "\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1(r') = |\<phi>|\<^sub>1(r) \<and> |\<phi>|\<^sub>2(r') = |\<phi>|\<^sub>2(r)"
-          by auto
+        by auto
 
       hence False using nonexistence by auto
     }
-    thus "\<forall>x \<in> |\<phi>|. x \<notin> |\<phi>|" by auto
+    thus
+      "\<forall>x \<in> |\<phi>|. x \<notin> |\<phi>|"
+      by auto
   qed
   thus ?thesis ..
 qed
@@ -212,13 +215,37 @@ qed
 
 theorem singleton: "\<exists>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
 proof -
-  from existence obtain a A where "a \<in> A" by auto
+  from existence obtain a A where
+    a_in_A: "a \<in> A" by auto
 
-  from comprehension[of A A "\<lambda>x y. x = a \<and> y = a"] obtain \<phi> where
-    "\<forall>x \<in> A. \<forall>y \<in> A. \<phi>(x, y) \<longleftrightarrow> x = a \<and> y = a"
+  from comprehension [of A A "\<lambda>x y. x = a \<and> y = a"] obtain \<phi> where
+    \<phi>_rel: "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<phi>(x, y) \<longleftrightarrow> x = a \<and> y = a"
       by auto
+  with tab_sufficient have
+    lemma_1: "\<forall>x \<in> A. \<forall>y \<in> A. x = a \<and> y = a \<longleftrightarrow> (\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1(r) = x \<and> |\<phi>|\<^sub>2(r) = y)"
+      by auto
+  then obtain r where
+    r_elem: "r \<in> |\<phi>|" and "|\<phi>|\<^sub>1(r) = a \<and> |\<phi>|\<^sub>2(r) = a"
+    using a_in_A by auto
 
-  with tab_sufficient
+  have "\<forall>r \<in> |\<phi>|. |\<phi>|\<^sub>1(r) = a \<and> |\<phi>|\<^sub>2(r) = a"
+  proof -
+    { fix r assume r_elem: "r \<in> |\<phi>|"
+    then have "|\<phi>|\<^sub>1(r) \<in> A" and "|\<phi>|\<^sub>2(r) \<in> A"
+      using
+        fst_is_func [OF \<phi>_rel]
+        snd_is_func [OF \<phi>_rel]
+        func_image_sort
+      by auto
+    with lemma_1 have "|\<phi>|\<^sub>1(r) = a \<and> |\<phi>|\<^sub>2(r) = a"
+      using r_elem by auto
+    }
+    thus ?thesis by auto
+  qed
+
+  with tab_minimal [OF \<phi>_rel] have "\<forall>s \<in> |\<phi>|. r = s" using r_elem by auto
+  thus ?thesis using r_elem by auto
+qed
 
 
 end
