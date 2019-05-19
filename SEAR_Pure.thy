@@ -1,5 +1,5 @@
 theory SEAR_Pure
-imports Pure_HOL
+imports Pure_FOL
 
 begin
 
@@ -14,16 +14,16 @@ section \<open>Logical foundations\<close>
 
 subsection \<open>Meta\<close>
 
-class Sort
+class sort
 
 typedecl set
-instance set :: Sort ..
+instance set :: sort ..
 
 typedecl elem
-instance elem :: Sort ..
+instance elem :: sort ..
 
 typedecl rel
-instance rel :: Sort ..
+instance rel :: sort ..
 
 
 subsection \<open>Sorted HOL and set theory\<close>
@@ -135,10 +135,20 @@ syntax
   "_the_set"  :: "[set, prop] \<Rightarrow> set" ("(\<iota>set  _ | _)")
   "_the_elem" :: "[elem, set, prop] \<Rightarrow> elem" ("(\<iota>elem _ \<in> _ | _)")
   "_the_rel"  :: "[rel, set, set, prop] \<Rightarrow> rel" ("(\<iota>rel _ : _ \<succ> _ | _)")
+
+  "_the_set_at"  :: "[set, aprop] \<Rightarrow> set" ("(\<iota>set  _ | _)")
+  "_the_elem_at" :: "[elem, set, aprop] \<Rightarrow> elem" ("(\<iota>elem _ \<in> _ | _)")
+  "_the_rel_at"  :: "[rel, set, set, aprop] \<Rightarrow> rel" ("(\<iota>rel _ : _ \<succ> _ | _)")
+
 translations
-  "\<iota>set X | PROP P" \<rightleftharpoons> "CONST the_set (\<lambda>X. P)"
-  "\<iota>elem x \<in> X | PROP Q" \<rightleftharpoons> "CONST the_elem X (\<lambda>x. Q)"
-  "\<iota>rel \<phi>: A \<succ> B | PROP R" \<rightleftharpoons> "CONST the_rel A B (\<lambda>\<phi>. R)"
+  "_the_set X P" \<rightleftharpoons> "CONST the_set (\<lambda>X. P)"
+  "_the_set_at X P" \<rightleftharpoons> "CONST the_set (\<lambda>X. P)"
+
+  "_the_elem x X Q" \<rightleftharpoons> "CONST the_elem X (\<lambda>x. Q)"
+  "_the_elem_at x X Q" \<rightleftharpoons> "CONST the_elem X (\<lambda>x. Q)"
+
+  "_the_rel \<phi> A B R" \<rightleftharpoons> "CONST the_rel A B (\<lambda>\<phi>. R)"
+  "_the_rel_at \<phi> A B R" \<rightleftharpoons> "CONST the_rel A B (\<lambda>\<phi>. R)"
 
 
 subsubsection \<open>Indefinite description for sets\<close>
@@ -146,8 +156,13 @@ subsubsection \<open>Indefinite description for sets\<close>
 axiomatization some_set :: "(set \<Rightarrow> prop) \<Rightarrow> set" where
   some_set_def: "\<exists>X. PROP P X \<Longrightarrow> PROP P (some_set P)"
 
-syntax "_some_set" :: "[set, prop] \<Rightarrow> set" ("(\<epsilon>set _ | _)")
-translations "\<epsilon>set X | PROP P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)"
+syntax
+  "_some_set" :: "[set, prop] \<Rightarrow> set" ("(\<epsilon>set _ | _)")
+  "_some_set_at" :: "[set, aprop] \<Rightarrow> set" ("(\<epsilon>set _ | _)")
+
+translations
+  "_some_set X P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)"
+  "_some_set_at X P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)"
 
 
 subsubsection \<open>Injectivity and surjectivity\<close>
@@ -174,30 +189,43 @@ abbreviation ex1_fun :: "[set, set, rel \<Rightarrow> prop] \<Rightarrow> prop"
   where "ex1_fun A B P \<equiv> (\<exists>\<exists>!f. f: A \<rightarrow> B \<and> PROP P f)"
 
 syntax
-  "_all_fun"  :: "[pttrn, set, set, prop] \<Rightarrow> prop" ("(\<forall>_: _ \<rightarrow> _./ _)"[0, 0, 0, 0] 1)
-  "_ex_fun"   :: "[pttrn, set, set, prop] \<Rightarrow> prop" ("(\<exists>_: _ \<rightarrow> _./ _)"[0, 0, 0, 0] 1)
-  "_ex1_fun"  :: "[pttrn, set, set, prop] \<Rightarrow> prop" ("(\<exists>!_: _ \<rightarrow> _./ _)"[0, 0, 0, 0] 1)
+  "_all_fun"    :: "[pttrn, set, set, prop] \<Rightarrow> prop" ("(\<forall>_: _ \<rightarrow> _./ _)" [0, 0, 0, 0] 1)
+  "_ex_fun"     :: "[pttrn, set, set, prop] \<Rightarrow> prop" ("(\<exists>_: _ \<rightarrow> _./ _)" [0, 0, 0, 0] 1)
+  "_ex1_fun"    :: "[pttrn, set, set, prop] \<Rightarrow> prop" ("(\<exists>!_: _ \<rightarrow> _./ _)" [0, 0, 0, 0] 1)
+
+  "_all_fun_at" :: "[pttrn, set, set, aprop] \<Rightarrow> prop" ("(\<forall>_: _ \<rightarrow> _./ _)" [0, 0, 0, 0] 1)
+  "_ex_fun_at"  :: "[pttrn, set, set, aprop] \<Rightarrow> prop" ("(\<exists>_: _ \<rightarrow> _./ _)" [0, 0, 0, 0] 1)
+  "_ex1_fun_at" :: "[pttrn, set, set, aprop] \<Rightarrow> prop" ("(\<exists>!_: _ \<rightarrow> _./ _)" [0, 0, 0, 0] 1)
+
 translations
-  "\<forall>f: A \<rightarrow> B. P"  \<rightleftharpoons> "CONST all_fun A B (\<lambda>f. P)"
-  "\<exists>f: A \<rightarrow> B. P"  \<rightleftharpoons> "CONST ex_fun A B (\<lambda>f. P)"
-  "\<exists>!f: A \<rightarrow> B. P" \<rightleftharpoons> "CONST ex1_fun A B (\<lambda>f. P)"
+  "_all_fun f A B P"  \<rightleftharpoons> "CONST all_fun A B (\<lambda>f. P)"
+  "_all_fun_at f A B P"  \<rightleftharpoons> "CONST all_fun A B (\<lambda>f. P)"
+
+  "_ex_fun f A B P"  \<rightleftharpoons> "CONST ex_fun A B (\<lambda>f. P)"
+  "_ex_fun_at f A B P"  \<rightleftharpoons> "CONST ex_fun A B (\<lambda>f. P)"
+
+  "_ex1_fun f A B P" \<rightleftharpoons> "CONST ex1_fun A B (\<lambda>f. P)"
+  "_ex1_fun_at f A B P" \<rightleftharpoons> "CONST ex1_fun A B (\<lambda>f. P)"
 
 axiomatization fun_app :: "[rel, elem] \<Rightarrow> elem" ("(_[_])"[100, 0])
   where fun_app_def: "f: A \<rightarrow> B \<Longrightarrow> f[x] \<equiv> \<iota>elem y \<in> B | f(x, y)"
 
 lemma fun_image:
-  assumes "f: A \<rightarrow> B" and "x \<in> A" 
+  assumes "f: A \<rightarrow> B" and "x \<in> A"
   shows "f(x, f[x])"
-  by (simp add: fun_app_def[OF assms(1)]) (auto simp: assms the_elem_sat)
+  apply (simp add: fun_app_def[OF assms(1)])
+  using assms the_elem_sat[of A "\<lambda>y. f(x, y)"]
+sorry
+
 
 lemma fun_image_elem_of:
-  assumes "f: A \<rightarrow> B" and "x \<in> A" 
+  assumes "f: A \<rightarrow> B" and "x \<in> A"
   shows "f[x] \<in> B"
   using assms fun_image holds_codom by blast
 
 lemma holds_fun_app_equiv:
   assumes "f: A \<rightarrow> B" and "x \<in> A" and "y \<in> B"
-  shows "f(x, y) \<longleftrightarrow> y = f[x]"
+  shows "f(x, y) \<Longleftrightarrow> y = f[x]"
 proof
   show "f(x, y) \<Longrightarrow> y = f[x]"
   proof -
@@ -218,7 +246,7 @@ qed
 text \<open>Injectivity and surjectivity of functions\<close>
 
 definition fun_inj :: "[rel, set, set] \<Rightarrow> prop" ("(_ : _ \<rightarrow> _ injective)")
-  where "f: A \<rightarrow> B injective \<equiv> f: A \<rightarrow> B \<and> (\<forall>a \<in> A. \<forall>a' \<in> A. f[a] = f[a'] \<longrightarrow> a = a')"
+  where "f: A \<rightarrow> B injective \<equiv> f: A \<rightarrow> B \<and> (\<forall>a \<in> A. \<forall>a' \<in> A. f[a] = f[a'] \<Longrightarrow> a = a')"
 
 definition fun_surj :: "[rel, set, set] \<Rightarrow> prop" ("(_ : _ \<rightarrow> _ surjective)")
   where "f: A \<rightarrow> B surjective \<equiv> f: A \<rightarrow> B \<and> (\<forall>b \<in> B. \<exists>a \<in> A. f[a] = b)"
@@ -236,7 +264,7 @@ axiomatization where
 
   existence: "\<exists>X. \<exists>\<exists>x. x \<in> X" and
 
-  rel_comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x \<in> A. \<forall>y \<in> B. \<phi>(x, y) \<longleftrightarrow> P x y"
+  rel_comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x \<in> A. \<forall>y \<in> B. \<phi>(x, y) \<Longleftrightarrow> PROP P x y"
 
 text \<open>
 A tabulation is a reflection of relations into sets.

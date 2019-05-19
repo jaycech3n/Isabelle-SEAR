@@ -1,4 +1,4 @@
-theory Pure_HOL
+theory Pure_FOL
 imports
   Pure
   "HOL-Eisbach.Eisbach"
@@ -6,7 +6,10 @@ imports
 
 begin
 
-text \<open>Extend the Pure logic itself with the usual connectives.\<close>
+text \<open>Extend the Pure logic itself with FOL connectives.\<close>
+
+class terms
+default_sort terms
 
 
 section \<open>Constants, quantifiers, and connectives\<close>
@@ -18,10 +21,10 @@ definition "True \<equiv> (\<And>P :: prop. P = P)"
 definition "False \<equiv> (\<And>P :: prop. P = True)"
 
 definition All :: "('a \<Rightarrow> prop) \<Rightarrow> prop" (binder "\<forall>" [0] 0)
-  where "(\<forall>x. PROP P x) \<equiv> (\<And>x. PROP P x)"
+  where "(\<forall>x. PROP P x) \<equiv> (\<And>x::'a::terms. PROP P x)"
 
 definition Ex :: "('a \<Rightarrow> prop) \<Rightarrow> prop" (binder "\<exists>" [0] 0)
-  where "(\<exists>x. PROP P x) \<equiv> (\<forall>Q :: prop. (\<forall>x. PROP P x \<Longrightarrow> PROP Q) \<Longrightarrow> PROP Q)"
+  where "(\<exists>x. PROP P x) \<equiv> (\<And>Q::prop. (\<forall>x. PROP P x \<Longrightarrow> PROP Q) \<Longrightarrow> PROP Q)"
 
 definition And (infix "\<and>" 4)
   where "P \<and> Q \<equiv> (PROP P &&& PROP Q)"
@@ -30,12 +33,12 @@ definition Ex1 :: "('a \<Rightarrow> prop) \<Rightarrow> prop" (binder "\<exists
   where "(\<exists>!x. PROP P x) \<equiv> (\<exists>x. PROP P x \<and> (\<forall>y. PROP P y \<Longrightarrow> y = x))"
 
 definition Or (infix "\<or>" 3)
-  where "P \<or> Q \<equiv> (\<forall>R. \<lbrakk>PROP P \<Longrightarrow> PROP R; PROP Q \<Longrightarrow> PROP R\<rbrakk> \<Longrightarrow> PROP R)"
+  where "P \<or> Q \<equiv> (\<And>R::prop. \<lbrakk>PROP P \<Longrightarrow> PROP R; PROP Q \<Longrightarrow> PROP R\<rbrakk> \<Longrightarrow> PROP R)"
 
 definition Not ("(\<not> _)" [5] 6)
   where "\<not>P \<equiv> (PROP P \<Longrightarrow> PROP False)"
 
-definition Iff (infix "\<Longleftrightarrow>" 0)
+definition Iff (infix "\<Longleftrightarrow>" 1)
   where "(P \<Longleftrightarrow> Q) \<equiv> (PROP P \<Longrightarrow> PROP Q) \<and> (PROP Q \<Longrightarrow> PROP P)"
 
 
@@ -57,7 +60,7 @@ named_theorems simps
 named_theorems subst
 named_theorems refine
 
-method logic declares intros elims dests subst refine = (
+method logic declares intros elims dests simps subst refine = (
   assumption | unfold All_def | fold All_def |
   rule intros | erule elims | drule dests | frule dests |
   simp add: simps | subst subst | subst (asm) subst |
