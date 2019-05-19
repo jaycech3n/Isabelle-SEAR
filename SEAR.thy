@@ -182,12 +182,12 @@ proof
   show "f(x, y) \<Longrightarrow> y = f[x]"
   proof -
     have observation:
-      "f(x, f[x])"
+    "f(x, f[x])"
       using assms(1-2) by (fact fun_image)
 
     assume "f(x, y)"
     with observation show
-      "y = f[x]"
+    "y = f[x]"
       using assms fun_image_elem_of by blast
   qed
 
@@ -245,11 +245,11 @@ corollary snd_is_fun: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>2: |
 
 corollary tab_sufficient:
   "\<phi>: A \<succ> B \<Longrightarrow> \<forall>x \<in> A. \<forall>y \<in> B. \<phi>(x, y) \<longleftrightarrow> (\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1[r] = x \<and> |\<phi>|\<^sub>2[r] = y)"
-  using tabulation by auto
+    using tabulation by auto
 
 corollary tab_minimal:
   "\<phi>: A \<succ> B \<Longrightarrow> \<forall>r \<in> |\<phi>|. \<forall>s \<in> |\<phi>|. |\<phi>|\<^sub>1[r] = |\<phi>|\<^sub>1[s] \<and> |\<phi>|\<^sub>2[r] = |\<phi>|\<^sub>2[s] \<longrightarrow> r = s"
-  using tabulation by blast
+    using tabulation by blast
 
 
 section \<open>Basic definitions and results\<close>
@@ -259,33 +259,33 @@ subsection \<open>Function extensionality\<close>
 lemma fun_ext: "\<forall>f: A \<rightarrow> B. \<forall>g: A \<rightarrow> B. (\<forall>x \<in> A. f[x] = g[x]) \<longrightarrow> f = g"
 proof -
   { fix f g :: rel assume
-      f_fun: "f: A \<rightarrow> B" and
-      g_fun: "g: A \<rightarrow> B" and
-      ptwise_eq: "\<forall>x \<in> A. f[x] = g[x]"
-  
-    have lemma_1:
-      "\<forall>x \<in> A. \<forall>y \<in> B. f(x, y) \<longleftrightarrow> g(x, y)"
-    proof -
-      { fix x y assume
-          x_elem: "x \<in> A" and
-          y_elem: "y \<in> B"
-        hence "f(x, y) \<longleftrightarrow> y = f[x]"
-          using holds_fun_app_equiv f_fun by auto
-        moreover have "y = g[x] \<longleftrightarrow> g(x, y)"
-          using holds_fun_app_equiv g_fun x_elem y_elem by auto
-        ultimately have "f(x, y) \<longleftrightarrow> g(x, y)"
-          using ptwise_eq x_elem by simp
-      }
-      thus ?thesis by auto
-    qed
+  f_fun: "f: A \<rightarrow> B" and
+  g_fun: "g: A \<rightarrow> B" and
+  ptwise_eq: "\<forall>x \<in> A. f[x] = g[x]"
 
-    have easy_observation:
-      "\<forall>x \<in> A. \<forall>y \<in> B. g(x, y) \<longleftrightarrow> g(x, y)"
-      by simp
+  have lemma_1:
+  "\<forall>x \<in> A. \<forall>y \<in> B. f(x, y) \<longleftrightarrow> g(x, y)"
+  proof -
+    { fix x y assume
+    x_elem: "x \<in> A" and
+    y_elem: "y \<in> B"
+    hence "f(x, y) \<longleftrightarrow> y = f[x]"
+      using holds_fun_app_equiv f_fun by auto
+    moreover have "y = g[x] \<longleftrightarrow> g(x, y)"
+      using holds_fun_app_equiv g_fun x_elem y_elem by auto
+    ultimately have "f(x, y) \<longleftrightarrow> g(x, y)"
+      using ptwise_eq x_elem by simp
+    }
+    thus ?thesis by auto
+  qed
 
-    with rel_comprehension[where P="\<lambda>x y. g(x, y)"] lemma_1 have
-      "f = g"
-      using f_fun g_fun by blast
+  have easy_observation:
+  "\<forall>x \<in> A. \<forall>y \<in> B. g(x, y) \<longleftrightarrow> g(x, y)"
+    by simp
+
+  with rel_comprehension[where P="\<lambda>x y. g(x, y)"] lemma_1 have
+  "f = g"
+    using f_fun g_fun by blast
   }
   thus ?thesis by auto
 qed
@@ -298,33 +298,32 @@ proof -
   from existence obtain a A where "a \<in> A" by auto
 
   from rel_comprehension[of A A "\<lambda>_ _. False"] obtain \<phi> where
-    \<phi>_rel: "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<not>\<phi>(x, y)"
-      by auto
+  \<phi>_rel: "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<not>\<phi>(x, y)"
+    by auto
   with tabulation have
-    lemma_1: "\<forall>x \<in> A. \<forall>y \<in> A. \<not>(\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1[r] = x \<and> |\<phi>|\<^sub>2[r] = y)"
-      by auto
+  lemma_1: "\<forall>x \<in> A. \<forall>y \<in> A. \<not>(\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1[r] = x \<and> |\<phi>|\<^sub>2[r] = y)"
+    by auto
 
   have "\<forall>r \<in> |\<phi>|. r \<notin> |\<phi>|"
   proof -
     { fix r assume for_contradiction: "r \<in> |\<phi>|"
-      then have "|\<phi>|\<^sub>1[r] \<in> A" and "|\<phi>|\<^sub>2[r] \<in> A"
-        using
-          fst_is_fun[OF \<phi>_rel]
-          snd_is_fun[OF \<phi>_rel]
-          fun_image_elem_of
-        by auto
-      hence
-        nonexistence: "\<not>(\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1[r'] = |\<phi>|\<^sub>1[r] \<and> |\<phi>|\<^sub>2[r'] = |\<phi>|\<^sub>2[r])"
-        using lemma_1 by auto
+    then have "|\<phi>|\<^sub>1[r] \<in> A" and "|\<phi>|\<^sub>2[r] \<in> A"
+      using
+        fst_is_fun[OF \<phi>_rel]
+        snd_is_fun[OF \<phi>_rel]
+        fun_image_elem_of
+      by auto
+    hence
+    nonexistence: "\<not>(\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1[r'] = |\<phi>|\<^sub>1[r] \<and> |\<phi>|\<^sub>2[r'] = |\<phi>|\<^sub>2[r])"
+      using lemma_1 by auto
 
-      from for_contradiction have
-        "\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1[r'] = |\<phi>|\<^sub>1[r] \<and> |\<phi>|\<^sub>2[r'] = |\<phi>|\<^sub>2[r]"
-        by auto
+    from for_contradiction have
+    "\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1[r'] = |\<phi>|\<^sub>1[r] \<and> |\<phi>|\<^sub>2[r'] = |\<phi>|\<^sub>2[r]"
+      by auto
 
-      hence False using nonexistence by auto
+    hence False using nonexistence by auto
     }
-    thus
-      "\<forall>x \<in> |\<phi>|. x \<notin> |\<phi>|"
+    thus "\<forall>x \<in> |\<phi>|. x \<notin> |\<phi>|"
       by auto
   qed
   thus ?thesis ..
@@ -546,6 +545,7 @@ proof -
 
   next assume "\<exists>S: \<one> \<succ> A. \<exists>i: B \<rightarrow> A. (B, terminal\<^bsub>B\<^esub>, i is_tabulation_of S: \<one> \<succ> A)"
   show "B \<subseteq> A" unfolding subset_of_def
+    
     sorry
 qed
 
