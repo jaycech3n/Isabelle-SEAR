@@ -1,207 +1,494 @@
+chapter \<open>Shulman's ``Sets, Elements, And Relations''\<close>
+
 theory SEAR
-imports FOL_Base
+imports
+  HOL.HOL
+  "HOL-Eisbach.Eisbach"
+  "HOL-Eisbach.Eisbach_Tools"
 
 begin
 
-text \<open>
-Shulman's Sets, Elements, And Relations, formulated as a theory of triply-sorted first-order logic.
-\<close>
 
+section \<open>Basic settings\<close>
+
+setup Pure_Thy.old_appl_syntax_setup
 declare[[eta_contract=false]]
 
 
-section \<open>Logical foundations\<close>
+section \<open>Logic and definitions\<close>
 
-subsection \<open>Meta\<close>
+subsection \<open>Sorts\<close>
 
-class Sort
+text \<open>
+We formulate the theory on top of HOL, but define a separate sort of objects, and modify the default
+quantifiers to only quantify over this sort.
+\<close>
+
+class sort
+
+text \<open>
+Three distinct sorts of object.
+The original formulation is dependently-sorted, but Isabelle's type class system can't do that.
+Instead, we ensure that every occurence of an element or relation in a formula appears together with
+its domain.
+\<close>
 
 typedecl set
-instance set :: Sort ..
-
 typedecl elem
-instance elem :: Sort ..
-
 typedecl rel
-instance rel :: Sort ..
+
+instance set  :: sort ..
+instance elem :: sort ..
+instance rel  :: sort ..
 
 
-subsection \<open>Sorted FOL and set theory\<close>
-
-subsubsection \<open>Basic judgments\<close>
+subsection \<open>Judgments\<close>
 
 axiomatization
-  elem_of :: "[elem, set] \<Rightarrow> o" (infix "\<in>" 50) and
-  rel_of  :: "[rel, set, set] \<Rightarrow> o" ("(_ : _ \<succ> _)"[51, 0, 51] 50) and
-  holds   :: "[rel, elem, elem] \<Rightarrow> o" ("(_'(_, _'))"[100, 0, 0]) where
+  elem_of :: "[elem, set] \<Rightarrow> bool" (infix "\<in>" 50) and
+  rel_of  :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<succ> _)"[51, 0, 51] 50) and
+  holds   :: "[rel, elem, elem] \<Rightarrow> bool"
 
-  holds_dom: "\<lbrakk>\<phi>: A \<succ> B; \<phi>(x, y)\<rbrakk> \<Longrightarrow> x \<in> A" and
-  holds_codom: "\<lbrakk>\<phi>: A \<succ> B; \<phi>(x, y)\<rbrakk> \<Longrightarrow> y \<in> B"
+syntax "_holds" :: "[elem, rel, elem] \<Rightarrow> bool" ("(_ _ _)")
+translations "x \<phi> y" \<rightleftharpoons> "CONST holds(\<phi>, x, y)"
 
-abbreviation "not_elem_of" :: "[elem, set] \<Rightarrow> o" (infix "\<notin>" 50)
+text \<open>We need to axiomatize what it means for a relation to have a particular domain and codomain.\<close>
+
+axiomatization where
+  rel_dom: "\<lbrakk>\<phi>: A \<succ> B; x \<phi> y\<rbrakk> \<Longrightarrow> x \<in> A" and
+  rel_cod: "\<lbrakk>\<phi>: A \<succ> B; x \<phi> y\<rbrakk> \<Longrightarrow> y \<in> B"
+
+abbreviation "not_elem_of" :: "[elem, set] \<Rightarrow> bool" (infix "\<notin>" 50)
   where "x \<notin> X \<equiv> \<not> x \<in> X"
 
 
-subsubsection \<open>Quantifiers\<close>
+subsection \<open>Quantifiers\<close>
+
+\<comment>\<open>Free up notation to be used by our quantifiers.\<close>
 
 no_notation
   All (binder "\<forall>" 10) and
-  Ex  (binder "\<exists>" 10) and
-  Ex1 (binder "\<exists>!" 10)
+  Ex  (binder "\<exists>" 10)
 notation
-  All (binder "\<forall>\<forall>" 10) and
-  Ex  (binder "\<exists>\<exists>" 10) and
-  Ex1 (binder "\<exists>\<exists>!" 10)
+  All (binder "ALL " 10) and
+  Ex  (binder "EX " 10)
 
-abbreviation all_set :: "(set \<Rightarrow> o) \<Rightarrow> o" (binder "\<forall>" 10)
-  where "\<forall>x. P x \<equiv> \<forall>\<forall>x::set. P x"
+no_syntax
+  "_Ex1" :: "pttrn \<Rightarrow> bool \<Rightarrow> bool" ("(3\<exists>!_./ _)" [0, 10] 10)
+  "_Not_Ex" :: "idts \<Rightarrow> bool \<Rightarrow> bool" ("(3\<nexists>_./ _)" [0, 10] 10)
+  "_Not_Ex1" :: "pttrn \<Rightarrow> bool \<Rightarrow> bool" ("(3\<nexists>!_./ _)" [0, 10] 10)
 
-abbreviation ex_set :: "(set \<Rightarrow> o) \<Rightarrow> o" (binder "\<exists>" 10)
-  where "\<exists>x. P x \<equiv> \<exists>\<exists>x::set. P x"
+definition all_set :: "(set \<Rightarrow> bool) \<Rightarrow> bool" (binder "\<forall>" 10)
+  where "\<forall>x. P(x) \<equiv> ALL x::set. P(x)"
 
-abbreviation ex1_set :: "(set \<Rightarrow> o) \<Rightarrow> o" (binder "\<exists>!" 10)
-  where "\<exists>!x. P x \<equiv> \<exists>\<exists>!x::set. P x"
+definition ex_set :: "(set \<Rightarrow> bool) \<Rightarrow> bool" (binder "\<exists>" 10)
+  where "\<exists>x. P(x) \<equiv> EX x::set. P(x)"
 
-abbreviation all_elem :: "[set, elem \<Rightarrow> o] \<Rightarrow> o"
-  where "all_elem X P \<equiv> \<forall>\<forall>x. x \<in> X \<longrightarrow> P x"
+definition ex1_set :: "(set \<Rightarrow> bool) \<Rightarrow> bool" (binder "\<exists>!" 10)
+  where "\<exists>!x. P(x) \<equiv> EX! x::set. P(x)"
 
-abbreviation ex_elem :: "[set, elem \<Rightarrow> o] \<Rightarrow> o"
-  where "ex_elem X P \<equiv> \<exists>\<exists>x. x \<in> X \<and> P x"
+definition all_elem :: "[set, elem \<Rightarrow> bool] \<Rightarrow> bool"
+  where "all_elem(X, P) \<equiv> ALL x. x \<in> X \<longrightarrow> P(x)"
 
-abbreviation ex1_elem :: "[set, elem \<Rightarrow> o] \<Rightarrow> o"
-  where "ex1_elem X P \<equiv> \<exists>\<exists>!x. x \<in> X \<and> P x"
+definition ex_elem :: "[set, elem \<Rightarrow> bool] \<Rightarrow> bool"
+  where "ex_elem(X, P) \<equiv> EX x. x \<in> X \<and> P(x)"
 
-abbreviation all_rel :: "[set, set, rel \<Rightarrow> o] \<Rightarrow> o"
-  where "all_rel A B P \<equiv> \<forall>\<forall>\<phi>. \<phi>: A \<succ> B \<longrightarrow> P \<phi>"
+definition ex1_elem :: "[set, elem \<Rightarrow> bool] \<Rightarrow> bool"
+  where "ex1_elem(X, P) \<equiv> EX! x. x \<in> X \<and> P(x)"
 
-abbreviation ex_rel :: "[set, set, rel \<Rightarrow> o] \<Rightarrow> o"
-  where "ex_rel A B P \<equiv> \<exists>\<exists>\<phi>. \<phi>: A \<succ> B \<and> P \<phi>"
+definition all_rel :: "[set, set, rel \<Rightarrow> bool] \<Rightarrow> bool"
+  where "all_rel(A, B, P) \<equiv> ALL \<phi>. \<phi>: A \<succ> B \<longrightarrow> P(\<phi>)"
 
-abbreviation ex1_rel :: "[set, set, rel \<Rightarrow> o] \<Rightarrow> o"
-  where "ex1_rel A B P \<equiv> \<exists>\<exists>!\<phi>. \<phi>: A \<succ> B \<and> P \<phi>"
+definition ex_rel :: "[set, set, rel \<Rightarrow> bool] \<Rightarrow> bool"
+  where "ex_rel(A, B, P) \<equiv> EX \<phi>. \<phi>: A \<succ> B \<and> P(\<phi>)"
 
-syntax
-  "_all_elem" :: "[idt, set, o] \<Rightarrow> o" ("(\<forall>_ \<in> _./ _)"[0, 0, 10] 11)
-  "_ex_elem"  :: "[idt, set, o] \<Rightarrow> o" ("(\<exists>_ \<in> _./ _)"[0, 0, 10] 11)
-  "_ex1_elem" :: "[idt, set, o] \<Rightarrow> o" ("(\<exists>!_ \<in> _./ _)"[0, 0, 10] 11)
-  "_all_rel"  :: "[idt, set, set, o] \<Rightarrow> o" ("(\<forall>_: _ \<succ> _./ _)"[0, 0, 0, 10] 11)
-  "_ex_rel"   :: "[idt, set, set, o] \<Rightarrow> o" ("(\<exists>_: _ \<succ> _./ _)"[0, 0, 0, 10] 11)
-  "_ex1_rel"  :: "[idt, set, set, o] \<Rightarrow> o" ("(\<exists>!_: _ \<succ> _./ _)"[0, 0, 0, 10] 11)
-translations
-  "\<forall>x \<in> X. P"  \<rightleftharpoons> "CONST all_elem X (\<lambda>x. P)"
-  "\<exists>x \<in> X. P"  \<rightleftharpoons> "CONST ex_elem X (\<lambda>x. P)"
-  "\<exists>!x \<in> X. P" \<rightleftharpoons> "CONST ex1_elem X (\<lambda>x. P)"
-  "\<forall>\<phi>: A \<succ> B. P"  \<rightleftharpoons> "CONST all_rel A B (\<lambda>\<phi>. P)"
-  "\<exists>\<phi>: A \<succ> B. P"  \<rightleftharpoons> "CONST ex_rel A B (\<lambda>\<phi>. P)"
-  "\<exists>!\<phi>: A \<succ> B. P" \<rightleftharpoons> "CONST ex1_rel A B (\<lambda>\<phi>. P)"
-
-
-subsubsection \<open>Definite description\<close>
-
-axiomatization
-  the_set  :: "(set \<Rightarrow> o) \<Rightarrow> set" and
-  the_elem :: "[set, elem \<Rightarrow> o] \<Rightarrow> elem" and
-  the_rel  :: "[set, set, rel \<Rightarrow> o] \<Rightarrow> rel" where
-
-  the_set_def: "\<exists>!X. P X \<Longrightarrow> P (the_set P)" and
-
-  the_elem_elem_of: "\<exists>!x \<in> X. Q x \<Longrightarrow> the_elem X Q \<in> X" and
-  the_elem_sat: "\<exists>!x \<in> X. Q x \<Longrightarrow> Q (the_elem X Q)" and
-
-  the_rel_sort: "\<exists>!\<phi>: A \<succ> B. R \<phi> \<Longrightarrow> the_rel A B R: A \<succ> B" and
-  the_rel_sat: "\<exists>!\<phi>: A \<succ> B. R \<phi> \<Longrightarrow> R (the_rel A B R)"
+definition ex1_rel :: "[set, set, rel \<Rightarrow> bool] \<Rightarrow> bool"
+  where "ex1_rel(A, B, P) \<equiv> EX! \<phi>. \<phi>: A \<succ> B \<and> P(\<phi>)"
 
 syntax
-  "_the_set"  :: "[set, o] \<Rightarrow> set" ("(\<iota>set  _ | _)")
-  "_the_elem" :: "[elem, set, o] \<Rightarrow> elem" ("(\<iota>elem _ \<in> _ | _)")
-  "_the_rel"  :: "[rel, set, set, o] \<Rightarrow> rel" ("(\<iota>rel _ : _ \<succ> _ | _)")
+  "_all_elem" :: "[idt, set, bool] \<Rightarrow> bool" ("(\<forall>_ \<in> _./ _)"[0, 0, 10] 11)
+  "_ex_elem"  :: "[idt, set, bool] \<Rightarrow> bool" ("(\<exists>_ \<in> _./ _)"[0, 0, 10] 11)
+  "_ex1_elem" :: "[idt, set, bool] \<Rightarrow> bool" ("(\<exists>!_ \<in> _./ _)"[0, 0, 10] 11)
+  "_all_rel"  :: "[idt, set, set, bool] \<Rightarrow> bool" ("(\<forall>_: _ \<succ> _./ _)"[0, 0, 0, 10] 11)
+  "_ex_rel"   :: "[idt, set, set, bool] \<Rightarrow> bool" ("(\<exists>_: _ \<succ> _./ _)"[0, 0, 0, 10] 11)
+  "_ex1_rel"  :: "[idt, set, set, bool] \<Rightarrow> bool" ("(\<exists>!_: _ \<succ> _./ _)"[0, 0, 0, 10] 11)
 translations
-  "\<iota>set X | P" \<rightleftharpoons> "CONST the_set (\<lambda>X. P)"
-  "\<iota>elem x \<in> X | Q" \<rightleftharpoons> "CONST the_elem X (\<lambda>x. Q)"
-  "\<iota>rel \<phi>: A \<succ> B | R" \<rightleftharpoons> "CONST the_rel A B (\<lambda>\<phi>. R)"
+  "\<forall>x \<in> X. P"  \<rightleftharpoons> "CONST all_elem(X, \<lambda>x. P)"
+  "\<exists>x \<in> X. P"  \<rightleftharpoons> "CONST ex_elem(X, \<lambda>x. P)"
+  "\<exists>!x \<in> X. P" \<rightleftharpoons> "CONST ex1_elem(X, \<lambda>x. P)"
+  "\<forall>\<phi>: A \<succ> B. P"  \<rightleftharpoons> "CONST all_rel(A, B, \<lambda>\<phi>. P)"
+  "\<exists>\<phi>: A \<succ> B. P"  \<rightleftharpoons> "CONST ex_rel(A, B, \<lambda>\<phi>. P)"
+  "\<exists>!\<phi>: A \<succ> B. P" \<rightleftharpoons> "CONST ex1_rel(A, B, \<lambda>\<phi>. P)"
 
 
-subsubsection \<open>Indefinite description for sets\<close>
+subsubsection \<open>Rules for quantifiers\<close>
 
-axiomatization some_set :: "(set \<Rightarrow> o) \<Rightarrow> set" where
-  some_set_def: "\<exists>X. P X \<Longrightarrow> P (some_set P)"
+\<comment>\<open>Following the quantifier rules implemented in HOL/HOL.thy.\<close>
 
-syntax "_some_set" :: "[set, o] \<Rightarrow> set" ("(\<epsilon>set _ | _)")
-translations "\<epsilon>set X | P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)"
+text \<open>Universal\<close>
+
+lemma
+  all_set_spec: "\<forall>X. P(X) \<Longrightarrow> P(X)" and
+
+  all_setI: "(\<And>X. P(X)) \<Longrightarrow> \<forall>X. P(X)" and
+
+  all_setE: "\<lbrakk>\<forall>X. P(X); P(X) \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R"
+
+  unfolding all_set_def by auto
+
+lemma
+  all_elem_spec: "\<lbrakk>\<forall>x \<in> X. P(x); x \<in> X\<rbrakk> \<Longrightarrow> P(x)" and
+
+  all_elemI: "(\<And>x. x \<in> X \<Longrightarrow> P(x)) \<Longrightarrow> \<forall>x \<in> X. P(x)" and
+
+  all_elemE: "\<lbrakk>\<forall>x \<in> X. P(x); (\<And>x. x \<in> X \<Longrightarrow> P(x)) \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R"
+
+  unfolding all_elem_def by auto
+
+lemma
+  all_rel_spec: "\<lbrakk>\<forall>\<phi>: A \<succ> B. P(\<phi>); \<phi>: A \<succ> B\<rbrakk> \<Longrightarrow> P(\<phi>)" and
+
+  all_relI: "(\<And>\<phi>. \<phi>: A \<succ> B \<Longrightarrow> P(\<phi>)) \<Longrightarrow> \<forall>\<phi>: A \<succ> B. P(\<phi>)" and
+
+  all_relE: "\<lbrakk>\<forall>\<phi>: A \<succ> B. P(\<phi>); (\<And>\<phi>. \<phi>: A \<succ> B \<Longrightarrow> P(\<phi>)) \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R"
+
+  unfolding all_rel_def by auto
 
 
-subsubsection \<open>Injectivity and surjectivity\<close>
+text \<open>Existential\<close>
 
-definition rel_inj :: "[rel, set, set] \<Rightarrow> o" ("(_ : _ \<succ> _ injective)")
-  where "\<phi>: A \<succ> B injective \<equiv> \<forall>a \<in> A. \<forall>a' \<in> A. (\<exists>b \<in> B. \<phi>(a, b) \<and> \<phi>(a', b)) \<longrightarrow> a = a'"
+lemma
+  ex_setI: "\<And>P. P(X) \<Longrightarrow> \<exists>X. P(X)" and
 
-definition rel_surj :: "[rel, set, set] \<Rightarrow> o" ("(_ : _ \<succ> _ surjective)")
-  where "\<phi>: A \<succ> B surjective \<equiv> \<forall>b \<in> B. \<exists>a \<in> A. \<phi>(a, b)"
+  ex_setE: "\<And>P. \<lbrakk>\<exists>X. P(X); \<And>X. P(X) \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R"
+and
+  ex_elemI: "\<And>P. \<lbrakk>x \<in> X; P(x)\<rbrakk> \<Longrightarrow> \<exists>x \<in> X. P(x)" and
+
+  ex_elemE: "\<And>P. \<lbrakk>\<exists>x \<in> X. P(x); \<And>x. \<lbrakk>x \<in> X; P(x)\<rbrakk> \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R"
+and
+  ex_relI: "\<And>P. \<lbrakk>\<phi>: A \<succ> B; P(\<phi>)\<rbrakk> \<Longrightarrow> \<exists>\<phi>: A \<succ> B. P(\<phi>)" and
+
+  ex_relE: "\<And>P. \<lbrakk>\<exists>\<phi>: A \<succ> B. P(\<phi>); \<And>\<phi>. \<lbrakk>\<phi>: A \<succ> B; P(\<phi>)\<rbrakk> \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R"
+
+  unfolding ex_set_def ex_elem_def ex_rel_def by auto
 
 
-subsubsection \<open>Functions\<close>
+text \<open>Unique existence\<close>
 
-abbreviation is_fun :: "[rel, set, set] \<Rightarrow> o" ("(_ : _ \<rightarrow> _)"[51, 0, 51] 50)
-  where "f: A \<rightarrow> B \<equiv> f: A \<succ> B \<and> (\<forall>x \<in> A. \<exists>!y \<in> B. f(x, y))"
+lemma
+  ex1_setI: "\<lbrakk>P(X); \<And>Y. P(Y) \<Longrightarrow> Y = X\<rbrakk> \<Longrightarrow> \<exists>!X. P(X)" and
 
-abbreviation all_fun :: "[set, set, rel \<Rightarrow> o] \<Rightarrow> o"
-  where "all_fun A B P \<equiv> \<forall>\<forall>f. f: A \<rightarrow> B \<longrightarrow> P f"
+  ex_ex1_setI: "\<lbrakk>\<exists>X. P(X); \<And>X Y. \<lbrakk>P(X); P(Y)\<rbrakk> \<Longrightarrow> X = Y\<rbrakk> \<Longrightarrow> \<exists>!X. P(X)" and
 
-abbreviation ex_fun :: "[set, set, rel \<Rightarrow> o] \<Rightarrow> o"
-  where "ex_fun A B P \<equiv> \<exists>\<exists>f. f: A \<rightarrow> B \<and> P f"
+  ex1_setE: "\<lbrakk>\<exists>!X. P(X); \<And>X. \<lbrakk>P(X); \<And>Y. P(Y) \<Longrightarrow> Y = X\<rbrakk> \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R" and
 
-abbreviation ex1_fun :: "[set, set, rel \<Rightarrow> o] \<Rightarrow> o"
-  where "ex1_fun A B P \<equiv> \<exists>\<exists>!f. f: A \<rightarrow> B \<and> P f"
+  alt_ex1_setE: "\<lbrakk>\<exists>!X. P(X); \<And>X. \<lbrakk>P(X); \<And>Y Y'. \<lbrakk>P(Y); P(Y')\<rbrakk> \<Longrightarrow> Y = Y'\<rbrakk> \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R" and
+
+  ex1_implies_ex_set: "\<exists>!X. P(X) \<Longrightarrow> \<exists>X. P(X)"
+
+  unfolding ex_set_def ex1_set_def by auto
+
+lemma
+  ex1_elemI: "\<lbrakk>x \<in> X; P(x); \<And>y. \<lbrakk>y \<in> X; P(y)\<rbrakk> \<Longrightarrow> y = x\<rbrakk> \<Longrightarrow> \<exists>!x \<in> X. P(x)" and
+
+  ex_ex1_elemI: "\<lbrakk>\<exists>x \<in> X. P(x); \<And>x y. \<lbrakk>x \<in> X; y \<in> X; P(x); P(y)\<rbrakk> \<Longrightarrow> x = y\<rbrakk> \<Longrightarrow> \<exists>!x \<in> X. P(x)" and
+
+  ex1_elemE: "\<lbrakk>\<exists>!x \<in> X. P(x); \<And>x. \<lbrakk>x \<in> X; P(x); \<And>y. \<lbrakk>y \<in> X; P(y)\<rbrakk> \<Longrightarrow> y = x\<rbrakk> \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R" and
+
+  alt_ex1_elemE: "\<lbrakk>\<exists>!x \<in> X. P(x);
+    \<And>x. \<lbrakk>x \<in> X; P(x); \<And>y y'. \<lbrakk>y \<in> X; y' \<in> X; P(y); P(y')\<rbrakk> \<Longrightarrow> y = y'\<rbrakk> \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R" and
+
+  ex1_implies_ex_elem: "\<exists>!x \<in> X. P(x) \<Longrightarrow> \<exists>x \<in> X. P(x)"
+
+  unfolding ex_elem_def ex1_elem_def by auto
+
+lemma
+  ex1_relI: "\<lbrakk>\<phi>: A \<succ> B; P(\<phi>); \<And>\<psi>. \<lbrakk>\<psi>: A \<succ> B; P(\<psi>)\<rbrakk> \<Longrightarrow> \<psi> = \<phi>\<rbrakk> \<Longrightarrow> \<exists>!\<phi>: A \<succ> B. P(\<phi>)" and
+
+  ex_ex1_relI: "\<lbrakk>\<exists>\<phi>: A \<succ> B. P(\<phi>);
+    \<And>\<phi> \<psi>. \<lbrakk>\<phi>: A \<succ> B; \<psi>: A \<succ> B; P(\<phi>); P(\<psi>)\<rbrakk> \<Longrightarrow> \<phi> = \<psi>\<rbrakk> \<Longrightarrow> \<exists>!\<phi>: A \<succ> B. P(\<phi>)" and
+
+  ex1_relE: "\<lbrakk>\<exists>!\<phi>: A \<succ> B. P(\<phi>);
+    \<And>\<phi>. \<lbrakk>\<phi>: A \<succ> B; P(\<phi>); \<And>\<psi>. \<lbrakk>\<psi>: A \<succ> B; P(\<psi>)\<rbrakk> \<Longrightarrow> \<psi> = \<phi>\<rbrakk> \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R" and
+
+  alt_ex1_relE: "\<lbrakk>\<exists>!\<phi>: A \<succ> B. P(\<phi>);
+    \<And>\<phi>. \<lbrakk>\<phi>: A \<succ> B; P(\<phi>); \<And>\<psi> \<psi>'. \<lbrakk>\<psi>: A \<succ> B; \<psi>': A \<succ> B; P(\<psi>); P(\<psi>')\<rbrakk> \<Longrightarrow> \<psi> = \<psi>'\<rbrakk> \<Longrightarrow> R\<rbrakk> \<Longrightarrow> R" and
+
+  ex1_implies_ex_rel: "\<exists>!\<phi>: A \<succ> B. P(\<phi>) \<Longrightarrow> \<exists>\<phi>: A \<succ> B. P(\<phi>)"
+
+  unfolding ex_rel_def ex1_rel_def by auto
+
+text \<open>Classical introduction\<close>
+
+lemma ex_setCI: "(\<forall>x. \<not>P(x) \<Longrightarrow> P(x)) \<Longrightarrow> \<exists>x. P(x)"
+  unfolding all_set_def ex_set_def by auto
+
+lemma ex_elemCI: "(\<forall>x \<in> X. \<not>P(x) \<Longrightarrow> x \<in> X \<and> P(x)) \<Longrightarrow> \<exists>x \<in> X. P(x)"
+  unfolding all_elem_def ex_elem_def by auto
+
+lemma ex_relCI: "(\<forall>\<phi>: A \<succ> B. \<not>P(\<phi>) \<Longrightarrow> \<phi>: A \<succ> B \<and> P(\<phi>)) \<Longrightarrow> \<exists>\<phi>: A \<succ> B. P(\<phi>)"
+  unfolding all_rel_def ex_rel_def by auto
+
+(* HOL has `allE'`, would we want this? And what about the `atomize` rules? *)
+
+
+declare
+  ex_ex1_setI [intro!]
+  ex_ex1_elemI [intro!]
+  ex_ex1_relI [intro!]
+and
+  all_setI [intro!]
+  all_elemI [intro!]
+  all_relI [intro!]
+and
+  ex_setI [intro]
+  ex_elemI [intro]
+  ex_relI [intro]
+and
+  ex_setE [elim!]
+  ex_elemE [elim!]
+  ex_relE [elim!]
+and
+  all_setE [elim]
+  all_elemE [elim]
+  all_relE [elim]
+and
+  ex1_setI [intro]
+  ex1_elemI [intro]
+  ex1_relI [intro]
+and
+  ex1_implies_ex_set [elim?]
+  ex1_implies_ex_elem [elim?]
+  ex1_implies_ex_rel [elim?]
+and
+  alt_ex1_setE [elim!]
+  alt_ex1_elemE [elim!]
+  alt_ex1_relE [elim!]
+
+
+text \<open>Simplification rules\<close>
+
+lemma all_set_simps [simp]:
+  "(\<forall>X. P) = P"
+  "(\<forall>X. X \<noteq> A) = False"
+  "(\<forall>X. A \<noteq> X) = False"
+  "\<And>P. (\<forall>X. X = A \<longrightarrow> P(X)) = P(A)"
+  "\<And>P. (\<forall>X. A = X \<longrightarrow> P(X)) = P(A)"
+  "\<And>P Q. (\<forall>x. P(x) \<and> Q) = ((\<forall>x. P(x)) \<and> Q)"
+  "\<And>P Q. (\<forall>x. P \<and> Q(x)) = (P \<and> (\<forall>x. Q(x)))"
+  "\<And>P Q. (\<forall>x. P(x) \<or> Q) = ((\<forall>x. P(x)) \<or> Q)"
+  "\<And>P Q. (\<forall>x. P \<or> Q(x)) = (P \<or> (\<forall>x. Q(x)))"
+  "\<And>P Q. (\<forall>x. P(x) \<longrightarrow> Q) = ((\<exists>x. P(x)) \<longrightarrow> Q)"
+  "\<And>P Q. (\<forall>x. P \<longrightarrow> Q(x)) = (P \<longrightarrow> (\<forall>x. Q(x)))"
+
+and ex_set_simps [simp]:
+  "(\<exists>X. P) = P"
+  "\<exists>X. X = A"
+  "\<exists>X. A = X"
+  "\<And>P. (\<exists>X. X = A \<and> P(X)) = P(A)"
+  "\<And>P. (\<exists>X. A = X \<and> P(X)) = P(A)"
+  "\<And>P Q. (\<exists>x. P(x) \<and> Q) = ((\<exists>x. P(x)) \<and> Q)"
+  "\<And>P Q. (\<exists>x. P \<and> Q(x)) = (P \<and> (\<exists>x. Q(x)))"
+  "\<And>P Q. (\<exists>x. P(x) \<or> Q) = ((\<exists>x. P(x)) \<or> Q)"
+  "\<And>P Q. (\<exists>x. P \<or> Q(x)) = (P \<or> (\<exists>x. Q(x)))"
+  "\<And>P Q. (\<exists>x. P(x) \<longrightarrow> Q) = ((\<forall>x. P(x)) \<longrightarrow> Q)"
+  "\<And>P Q. (\<exists>x. P \<longrightarrow> Q(x)) = (P \<longrightarrow> (\<exists>x. Q(x)))"
+
+  by auto+
+
+
+subsection \<open>Definite description\<close>
+
+definition "the_set(P) \<equiv> THE X::set. P(X)"
+definition "the_elem(X, P) \<equiv> THE x. x \<in> X \<and> P(x)"
+definition "the_rel(A, B, P) \<equiv> THE \<phi>. \<phi>: A \<succ> B \<and> P(\<phi>)"
 
 syntax
-  "_all_fun"  :: "[idt, set, set, o] \<Rightarrow> o" ("(\<forall>_: _ \<rightarrow> _./ _)"[0, 0, 0, 10] 11)
-  "_ex_fun"   :: "[idt, set, set, o] \<Rightarrow> o" ("(\<exists>_: _ \<rightarrow> _./ _)"[0, 0, 0, 10] 11)
-  "_ex1_fun"  :: "[idt, set, set, o] \<Rightarrow> o" ("(\<exists>!_: _ \<rightarrow> _./ _)"[0, 0, 0, 10] 11)
+  "_the_set"  :: "[set, bool] \<Rightarrow> set" ("(the _. _)" 49)
+  "_the_elem" :: "[elem, set, bool] \<Rightarrow> elem" ("(the '(_ \<in> _'). _)" 49)
+  "_the_rel"  :: "[rel, set, set, bool] \<Rightarrow> rel" ("(the '(_: _ \<succ> _'). _)" 49)
 translations
-  "\<forall>f: A \<rightarrow> B. P"  \<rightleftharpoons> "CONST all_fun A B (\<lambda>f. P)"
-  "\<exists>f: A \<rightarrow> B. P"  \<rightleftharpoons> "CONST ex_fun A B (\<lambda>f. P)"
-  "\<exists>!f: A \<rightarrow> B. P" \<rightleftharpoons> "CONST ex1_fun A B (\<lambda>f. P)"
+  "the X. P" \<rightleftharpoons> "CONST the_set(\<lambda>X. P)"
+  "the (x \<in> X). Q" \<rightleftharpoons> "CONST the_elem(X, \<lambda>x. Q)"
+  "the (\<phi>: A \<succ> B). R" \<rightleftharpoons> "CONST the_rel(A, B, \<lambda>\<phi>. R)"
 
-axiomatization fun_app :: "[rel, elem] \<Rightarrow> elem" ("(_[_])"[100, 0])
-  where fun_app_def: "f: A \<rightarrow> B \<Longrightarrow> f[x] \<equiv> \<iota>elem y \<in> B | f(x, y)"
+lemma the_set_equality: "\<lbrakk>P(X); \<And>Y. P(Y) \<Longrightarrow> Y = X\<rbrakk> \<Longrightarrow> (the X. P(X)) = X"
+  unfolding the_set_def by blast
 
-lemma fun_image:
+lemma the_setI: "\<lbrakk>P(X); \<And>Y. P(Y) \<Longrightarrow> Y = X\<rbrakk> \<Longrightarrow> P(the X. P(X))"
+  by (subst the_set_equality)
+
+lemma the_setI': "\<exists>!X. P(X) \<Longrightarrow> P(the X. P(X))"
+  by (auto intro: the_setI)
+
+lemma the_setI2: "\<lbrakk>P(X); \<And>Y. P(Y) \<Longrightarrow> Y = X; \<And>X. P(X) \<Longrightarrow> Q(X)\<rbrakk> \<Longrightarrow> Q(the X. P(X))"
+  by (auto intro: the_setI)
+
+lemma the_setI2': "\<lbrakk>\<exists>!X. P(X); \<And>X. P(X) \<Longrightarrow> Q(X)\<rbrakk> \<Longrightarrow> Q(the X. P(X))"
+  by (auto intro: the_setI2[where ?P=P and ?Q=Q])
+
+lemma the_set_equality': "\<lbrakk>\<exists>!X. P(X); P(X)\<rbrakk> \<Longrightarrow> (the X. P(X)) = X"
+  by (auto intro: the_set_equality)
+
+lemma the_set_sym_eq_trivial: "(the Y. X = Y) = X"
+  by (auto intro: the_set_equality)
+
+lemma the_elem_equality: "\<lbrakk>x \<in> X; P(x); \<And>y. \<lbrakk>y \<in> X; P(y)\<rbrakk> \<Longrightarrow> y = x\<rbrakk> \<Longrightarrow> (the (x \<in> X). P(x)) = x"
+  unfolding the_elem_def by blast
+
+lemma the_elemI: "\<lbrakk>x \<in> X; P(x); \<And>y. \<lbrakk>y \<in> X; P(y)\<rbrakk> \<Longrightarrow> y = x\<rbrakk> \<Longrightarrow> P(the (x \<in> X). P(x))"
+  by (subst the_elem_equality)
+
+lemma the_elemI': "\<exists>!x \<in> X. P(x) \<Longrightarrow> P(the (x \<in> X). P(x))"
+  by (auto intro: the_elemI)
+
+lemma the_elem_sort': "\<exists>!x \<in> X. P(x) \<Longrightarrow> (the (x \<in> X). P(x)) \<in> X"
+  unfolding ex1_elem_def the_elem_def by (blast dest!: theI')
+
+lemma the_elem_sort: "\<lbrakk>x \<in> X; P(x); \<And>y. \<lbrakk>y \<in> X; P(y)\<rbrakk> \<Longrightarrow> y = x\<rbrakk> \<Longrightarrow> (the (x \<in> X). P(x)) \<in> X"
+  by (blast intro: the_elem_sort')
+
+lemma the_elemI2:
+  "\<lbrakk>x \<in> X; P(x); \<And>y. \<lbrakk>y \<in> X; P(y)\<rbrakk> \<Longrightarrow> y = x;
+    \<And>x. \<lbrakk>x \<in> X; P(x)\<rbrakk> \<Longrightarrow> Q(x)\<rbrakk> \<Longrightarrow> Q(the (x \<in> X). P(x))"
+  by (auto intro: the_elem_sort the_elemI)
+
+lemma the_elemI2': "\<lbrakk>\<exists>!x \<in> X. P(x); \<And>x. \<lbrakk>x \<in> X; P(x)\<rbrakk> \<Longrightarrow> Q(x)\<rbrakk> \<Longrightarrow> Q(the (x \<in> X). P(x))"
+  by (auto intro: the_elemI2[where ?P=P and ?Q=Q])
+
+lemma the_elem_equality': "\<lbrakk>\<exists>!x \<in> X. P(x); x \<in> X; P(x)\<rbrakk> \<Longrightarrow> (the (x \<in> X). P(x)) = x"
+  by (auto intro: the_elem_equality)
+
+lemma the_elem_sym_eq_trivial: "x \<in> X \<Longrightarrow> (the (y \<in> X). x = y) = x"
+  by (auto intro: the_elem_equality)
+
+lemma the_rel_equality: "\<lbrakk>\<phi>: A \<succ> B; P(\<phi>); \<And>\<psi>. \<lbrakk>\<psi>: A \<succ> B; P(\<psi>)\<rbrakk> \<Longrightarrow> \<psi> = \<phi>\<rbrakk> \<Longrightarrow> (the (\<phi>: A \<succ> B). P(\<phi>)) = \<phi>"
+  unfolding the_rel_def by blast
+
+lemma the_relI: "\<lbrakk>\<phi>: A \<succ> B; P(\<phi>); \<And>\<psi>. \<lbrakk>\<psi>: A \<succ> B; P(\<psi>)\<rbrakk> \<Longrightarrow> \<psi> = \<phi>\<rbrakk> \<Longrightarrow> P(the (\<phi>: A \<succ> B). P(\<phi>))"
+  by (subst the_rel_equality)
+
+lemma the_relI': "\<exists>!\<phi>: A \<succ> B. P(\<phi>) \<Longrightarrow> P(the (\<phi>: A \<succ> B). P(\<phi>))"
+  by (auto intro: the_relI)
+
+lemma the_rel_sort': "\<exists>!\<phi>: A \<succ> B. P(\<phi>) \<Longrightarrow> (the (\<phi>: A \<succ> B). P(\<phi>)): A \<succ> B"
+  unfolding ex1_rel_def the_rel_def by (blast dest!: theI')
+
+lemma the_rel_sort: "\<lbrakk>\<phi>: A \<succ> B; P(\<phi>);
+  \<And>\<psi>. \<lbrakk>\<psi>: A \<succ> B; P(\<psi>)\<rbrakk> \<Longrightarrow> \<psi> = \<phi>\<rbrakk> \<Longrightarrow> (the (\<phi>: A \<succ> B). P(\<phi>)): A \<succ> B"
+  by (blast intro: the_rel_sort')
+
+lemma the_relI2:
+  "\<lbrakk>\<phi>: A \<succ> B; P(\<phi>); \<And>\<psi>. \<lbrakk>\<psi>: A \<succ> B; P(\<psi>)\<rbrakk> \<Longrightarrow> \<psi> = \<phi>;
+    \<And>\<phi>. \<lbrakk>\<phi>: A \<succ> B; P(\<phi>)\<rbrakk> \<Longrightarrow> Q(\<phi>)\<rbrakk> \<Longrightarrow> Q(the (\<phi>: A \<succ> B). P(\<phi>))"
+  by (auto intro: the_rel_sort the_relI)
+
+lemma the_relI2': "\<lbrakk>\<exists>!\<phi>: A \<succ> B. P(\<phi>); \<And>\<phi>. \<lbrakk>\<phi>: A \<succ> B; P(\<phi>)\<rbrakk> \<Longrightarrow> Q(\<phi>)\<rbrakk> \<Longrightarrow> Q(the (\<phi>: A \<succ> B). P(\<phi>))"
+  by (auto intro: the_relI2[where ?P=P and ?Q=Q])
+
+lemma the_rel_equality': "\<lbrakk>\<exists>!\<phi>: A \<succ> B. P(\<phi>); \<phi>: A \<succ> B; P(\<phi>)\<rbrakk> \<Longrightarrow> (the (\<phi>: A \<succ> B). P(\<phi>)) = \<phi>"
+  by (auto intro: the_rel_equality)
+
+lemma the_rel_sym_eq_trivial: "\<phi>: A \<succ> B \<Longrightarrow> (the (\<psi>: A \<succ> B). \<phi> = \<psi>) = \<phi>"
+  by (auto intro: the_rel_equality)
+
+
+declare
+  the_set_equality [intro]
+  the_elem_equality [intro]
+  the_rel_equality [intro]
+and
+  the_set_equality' [elim?]
+  the_elem_equality' [elim?]
+  the_rel_equality' [elim?]
+
+
+subsection \<open>Indefinite description for sets\<close>
+
+axiomatization some_set :: "(set \<Rightarrow> bool) \<Rightarrow> set"
+  where some_set_prop: "\<exists>X. P(X) \<Longrightarrow> P(some_set(\<lambda>x. P(x)))"
+
+syntax "_some_set" :: "[set, bool] \<Rightarrow> set" ("(\<epsilon> _. _)")
+translations "\<epsilon> X. P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)"
+
+
+subsection \<open>Injectivity and surjectivity of relations\<close>
+
+definition injective :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<succ> _ injective)")
+  where "\<phi>: A \<succ> B injective \<equiv> \<forall>a \<in> A. \<forall>a' \<in> A. (\<exists>b \<in> B. (a \<phi> b) \<and> (a' \<phi> b)) \<longrightarrow> a = a'"
+
+definition surjective :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<succ> _ surjective)")
+  where "\<phi>: A \<succ> B surjective \<equiv> \<forall>b \<in> B. \<exists>a \<in> A. (a \<phi> b)"
+
+
+subsection \<open>Functions\<close>
+
+subsubsection \<open>Quantifiers\<close>
+
+definition fun :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<rightarrow> _)"[51, 0, 51] 50)
+  where "f: A \<rightarrow> B \<equiv> f: A \<succ> B \<and> (\<forall>x \<in> A. \<exists>!y \<in> B. (x f y))"
+
+definition all_fun :: "[set, set, rel \<Rightarrow> bool] \<Rightarrow> bool"
+  where "all_fun(A, B, P) \<equiv> ALL f. f: A \<rightarrow> B \<longrightarrow> P(f)"
+
+abbreviation ex_fun :: "[set, set, rel \<Rightarrow> bool] \<Rightarrow> bool"
+  where "ex_fun(A, B, P) \<equiv> EX f. f: A \<rightarrow> B \<and> P(f)"
+
+abbreviation ex1_fun :: "[set, set, rel \<Rightarrow> bool] \<Rightarrow> bool"
+  where "ex1_fun(A, B, P) \<equiv> EX! f. f: A \<rightarrow> B \<and> P(f)"
+
+syntax
+  "_all_fun"  :: "[idt, set, set, bool] \<Rightarrow> bool" ("(\<forall>_: _ \<rightarrow> _./ _)"[0, 0, 0, 10] 11)
+  "_ex_fun"   :: "[idt, set, set, bool] \<Rightarrow> bool" ("(\<exists>_: _ \<rightarrow> _./ _)"[0, 0, 0, 10] 11)
+  "_ex1_fun"  :: "[idt, set, set, bool] \<Rightarrow> bool" ("(\<exists>!_: _ \<rightarrow> _./ _)"[0, 0, 0, 10] 11)
+translations
+  "\<forall>f: A \<rightarrow> B. P"  \<rightleftharpoons> "CONST all_fun(A, B, \<lambda>f. P)"
+  "\<exists>f: A \<rightarrow> B. P"  \<rightleftharpoons> "CONST ex_fun(A, B, \<lambda>f. P)"
+  "\<exists>!f: A \<rightarrow> B. P" \<rightleftharpoons> "CONST ex1_fun(A, B, \<lambda>f. P)"
+
+
+subsubsection \<open>Application\<close>
+
+axiomatization app :: "[rel, elem] \<Rightarrow> elem" (infixl "`" 100)
+  where fun_app_def: "f: A \<rightarrow> B \<Longrightarrow> f`x \<equiv> the (y \<in> B). (x f y)"
+
+subsubsection \<open>Rules\<close>
+
+lemma fun_rel: "f: A \<rightarrow> B \<Longrightarrow> f: A \<succ> B"
+  unfolding fun_def by auto
+
+lemma fun_uniq_val': "\<lbrakk>f: A \<rightarrow> B; x \<in> A\<rbrakk> \<Longrightarrow> \<exists>!y \<in> B. (x f y)"
+  unfolding fun_def by blast
+
+lemma fun_uniq_val:
+  "\<lbrakk>f: A \<rightarrow> B; x \<in> A; y \<in> B; y' \<in> B; x f y; x f y'\<rbrakk> \<Longrightarrow> y = y'"
+  by (auto dest: fun_uniq_val')
+
+lemma fun_graph:
   assumes "f: A \<rightarrow> B" and "x \<in> A" 
-  shows "f(x, f[x])"
-  by (simp add: fun_app_def[OF assms(1)]) (auto simp: assms the_elem_sat)
+  shows "x f (f`x)"
+  using assms fun_uniq_val' fun_app_def the_elemI'[where ?P="\<lambda>y. (x f y)"]
+  by auto
 
-lemma fun_image_elem_of:
+lemma appI:
   assumes "f: A \<rightarrow> B" and "x \<in> A" 
-  shows "f[x] \<in> B"
-  using assms fun_image holds_codom by blast
+  shows "f`x \<in> B"
+  using assms fun_rel fun_graph
+  by (intro rel_cod)
 
-lemma holds_fun_app_equiv:
+lemma holds_app_iff:
   assumes "f: A \<rightarrow> B" and "x \<in> A" and "y \<in> B"
-  shows "f(x, y) \<longleftrightarrow> y = f[x]"
-proof
-  show "f(x, y) \<Longrightarrow> y = f[x]"
-  proof -
-    have observation:
-    "f(x, f[x])"
-      using assms(1-2) by (fact fun_image)
+  shows "(x f y) \<longleftrightarrow> y = f`x"
+  by (auto intro: assms fun_graph appI fun_uniq_val)
 
-    assume "f(x, y)"
-    with observation show
-    "y = f[x]"
-      using assms fun_image_elem_of by blast
-  qed
-
-  next show "y = f[x] \<Longrightarrow> f(x, y)"
-    using assms fun_image by simp
-qed
 
 text \<open>Injectivity and surjectivity of functions\<close>
 
-definition fun_inj :: "[rel, set, set] \<Rightarrow> o" ("(_ : _ \<rightarrow> _ injective)")
-  where "f: A \<rightarrow> B injective \<equiv> f: A \<rightarrow> B \<and> (\<forall>a \<in> A. \<forall>a' \<in> A. f[a] = f[a'] \<longrightarrow> a = a')"
+definition fun_inj :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<rightarrow> _ injective)")
+  where "f: A \<rightarrow> B injective \<equiv> f: A \<rightarrow> B \<and> (\<forall>a \<in> A. \<forall>a' \<in> A. f`a = f`a' \<longrightarrow> a = a')"
 
-definition fun_surj :: "[rel, set, set] \<Rightarrow> o" ("(_ : _ \<rightarrow> _ surjective)")
-  where "f: A \<rightarrow> B surjective \<equiv> f: A \<rightarrow> B \<and> (\<forall>b \<in> B. \<exists>a \<in> A. f[a] = b)"
+definition fun_surj :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<rightarrow> _ surjective)")
+  where "f: A \<rightarrow> B surjective \<equiv> f: A \<rightarrow> B \<and> (\<forall>b \<in> B. \<exists>a \<in> A. f`a = b)"
 
 lemma fun_inj_implies_rel_inj: "f: A \<rightarrow> B injective \<Longrightarrow> f: A \<succ> B injective"
   sorry
@@ -214,16 +501,16 @@ section \<open>Axioms\<close>
 
 axiomatization where
 
-  existence: "\<exists>X. \<exists>\<exists>x. x \<in> X" and
+  existence: "\<exists>X. EX x. x \<in> X" and
 
-  rel_comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x \<in> A. \<forall>y \<in> B. \<phi>(x, y) \<longleftrightarrow> P x y"
+  rel_comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x \<in> A. \<forall>y \<in> B. (x \<phi> y) \<longleftrightarrow> P(x, y)"
 
 text \<open>
 A tabulation is a reflection of relations into sets.
 The third axiom states that tabulations exist.
 \<close>
 
-abbreviation (input) is_tabulation_of :: "[set, rel, rel, rel, set, set] \<Rightarrow> o"
+abbreviation (input) is_tabulation_of :: "[set, rel, rel, rel, set, set] \<Rightarrow> bool"
   ("(_, _, _ is'_tabulation'_of _ : _ \<succ> _)")
 where
   "T, f1, f2 is_tabulation_of \<phi>: A \<succ> B \<equiv>
@@ -403,7 +690,7 @@ qed
 
 subsection \<open>The unique function into the singleton \<one>\<close>
 
-lemma singleton_terminal: "\<exists>\<exists>!f. f: X \<rightarrow> \<one>"
+lemma singleton_terminal: "EX! f. f: X \<rightarrow> \<one>"
 proof
   from singleton_prop
   obtain pt where
@@ -414,7 +701,7 @@ proof
   f_rel: "f: X \<succ> \<one>" and
   f_def: "\<forall>x \<in> X. \<forall>y \<in> \<one>. f(x, y) \<longleftrightarrow> y = pt"
     by auto
-  thus "\<exists>\<exists>f. f: X \<rightarrow> \<one>"
+  thus "EX f. f: X \<rightarrow> \<one>"
     using pt_elem by blast
 
   fix f g assume
@@ -455,9 +742,9 @@ text \<open>
 Differently from Shulman, we define subsets as tabulations satisfying certain properties.
 \<close>
 
-definition subset_of :: "[set, set] \<Rightarrow> o" (infix "\<subseteq>" 50)
+definition subset_of :: "[set, set] \<Rightarrow> bool" (infix "\<subseteq>" 50)
   where "B \<subseteq> A \<equiv>
-    \<exists>S: \<one> \<succ> A. \<exists>\<exists>i. (i: B \<rightarrow> A injective) \<and> (\<forall>pt \<in> \<one>. \<forall>a \<in> A. S(pt, a) \<longleftrightarrow> (\<exists>b \<in> B. i[b] = a))"
+    \<exists>S: \<one> \<succ> A. EX i. (i: B \<rightarrow> A injective) \<and> (\<forall>pt \<in> \<one>. \<forall>a \<in> A. S(pt, a) \<longleftrightarrow> (\<exists>b \<in> B. i[b] = a))"
 
 lemma subsets_are_tabulations:
   "B \<subseteq> A \<Longrightarrow> \<exists>S: \<one> \<succ> A. \<exists>i: B \<rightarrow> A. (B, terminal\<^bsub>B\<^esub>, i is_tabulation_of S: \<one> \<succ> A)" and
