@@ -1,10 +1,14 @@
 chapter \<open>Shulman's ``Sets, Elements, And Relations''\<close>
 
 theory SEAR
+
 imports
   HOL.HOL
   "HOL-Eisbach.Eisbach"
   "HOL-Eisbach.Eisbach_Tools"
+
+keywords
+  "relation" :: thy_decl
 
 begin
 
@@ -22,6 +26,12 @@ subsection \<open>Sorts\<close>
 text \<open>
 We formulate the theory on top of HOL, but define a separate sort of objects, and modify the default
 quantifiers to only quantify over this sort.
+\<close>
+
+\<comment>\<open>
+Should at some point take a hard look at the actual logical strength/consistency of this theory.
+Note for instance that most of the logical connectives and constants are defined using higher-order
+statements.
 \<close>
 
 class sort
@@ -229,7 +239,7 @@ lemma ex_elemCI: "(\<forall>x \<in> X. \<not>P(x) \<Longrightarrow> x \<in> X \<
 lemma ex_relCI: "(\<forall>\<phi>: A \<succ> B. \<not>P(\<phi>) \<Longrightarrow> \<phi>: A \<succ> B \<and> P(\<phi>)) \<Longrightarrow> \<exists>\<phi>: A \<succ> B. P(\<phi>)"
   unfolding all_rel_def ex_rel_def by auto
 
-(* HOL has `allE'`, would we want this? And what about the `atomize` rules? *)
+(* HOL has `allE'`, would we want this? *)
 
 
 declare
@@ -264,6 +274,47 @@ and
   alt_ex1_setE [elim!]
   alt_ex1_elemE [elim!]
   alt_ex1_relE [elim!]
+
+text \<open>Rulify & atomize—conversion with meta quantification\<close>
+
+lemma
+  rulify_all_set: "\<And>P. Trueprop(\<forall>X. P(X)) \<equiv> (\<And>X. P(X))" and
+  rulify_all_elem: "\<And>P. Trueprop(\<forall>x \<in> X. P(x)) \<equiv> (\<And>x. x \<in> X \<Longrightarrow> P(x))" and
+  rulify_all_rel: "\<And>P. Trueprop(\<forall>\<phi>: A \<succ> B. P(\<phi>)) \<equiv> (\<And>\<phi>. \<phi>: A \<succ> B \<Longrightarrow> P(\<phi>))"
+and
+  rulify_ex_setL': "\<And>P Q. Trueprop((\<exists>X. P(X)) \<longrightarrow> Q) \<equiv> (\<And>X. P(X) \<Longrightarrow> Q)" and
+  rulify_ex_elemL': "\<And>P Q. Trueprop((\<exists>x \<in> X. P(x)) \<longrightarrow> Q) \<equiv> (\<And>x. \<lbrakk>x \<in> X; P(x)\<rbrakk> \<Longrightarrow> Q)" and
+  rulify_ex_relL': "\<And>P Q. Trueprop((\<exists>\<phi>: A \<succ> B. P(\<phi>))\<longrightarrow> Q) \<equiv> (\<And>\<phi>. \<lbrakk>\<phi>: A \<succ> B; P(\<phi>)\<rbrakk> \<Longrightarrow> Q)"
+and
+  rulify_ex_setL: "\<And>P Q. ((\<exists>X. P(X)) \<Longrightarrow> Q) \<equiv> (\<And>X. P(X) \<Longrightarrow> Q)" and
+  rulify_ex_elemL: "\<And>P Q. ((\<exists>x \<in> X. P(x)) \<Longrightarrow> Q) \<equiv> (\<And>x. \<lbrakk>x \<in> X; P(x)\<rbrakk> \<Longrightarrow> Q)" and
+  rulify_ex_relL: "\<And>P Q. ((\<exists>\<phi>: A \<succ> B. P(\<phi>)) \<Longrightarrow> Q) \<equiv> (\<And>\<phi>. \<lbrakk>\<phi>: A \<succ> B; P(\<phi>)\<rbrakk> \<Longrightarrow> Q)"
+
+  by (rule, auto)+
+
+lemmas rulify_quants [rulify, simp] =  \<comment>\<open>Not quite sure `simp` is a good idea here.\<close>
+  rulify_all_set
+  rulify_all_elem
+  rulify_all_rel
+  rulify_ex_setL'
+  rulify_ex_elemL'
+  rulify_ex_relL'
+  rulify_ex_setL
+  rulify_ex_elemL
+  rulify_ex_relL
+
+lemmas [symmetric, atomize] =
+  rulify_all_set
+  rulify_all_elem
+  rulify_all_rel
+  rulify_ex_setL'
+  rulify_ex_elemL'
+  rulify_ex_relL'
+
+lemmas [symmetric, atomize_elim] =
+  rulify_ex_setL
+  rulify_ex_elemL
+  rulify_ex_relL
 
 
 text \<open>Simplification rules\<close>
@@ -393,448 +444,350 @@ lemma the_rel_sym_eq_trivial: "\<phi>: A \<succ> B \<Longrightarrow> (the (\<psi
   by (auto intro: the_rel_equality)
 
 
-declare
-  the_set_equality [intro]
-  the_elem_equality [intro]
-  the_rel_equality [intro]
-and
-  the_set_equality' [elim?]
-  the_elem_equality' [elim?]
-  the_rel_equality' [elim?]
+lemmas [intro] =
+  the_set_equality
+  the_elem_equality
+  the_rel_equality
+
+lemmas [elim?] =
+  the_set_equality'
+  the_elem_equality'
+  the_rel_equality'
+  the_setI'
+  the_elemI'
+  the_relI'
+  the_elem_sort'
+  the_rel_sort'
 
 
 subsection \<open>Indefinite description for sets\<close>
 
 axiomatization some_set :: "(set \<Rightarrow> bool) \<Rightarrow> set"
-  where some_set_prop: "\<exists>X. P(X) \<Longrightarrow> P(some_set(\<lambda>x. P(x)))"
+  where some_setI: "\<exists>X. P(X) \<Longrightarrow> P(some_set(\<lambda>X. P(X)))"
 
-syntax "_some_set" :: "[set, bool] \<Rightarrow> set" ("(\<epsilon> _. _)")
-translations "\<epsilon> X. P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)"
+syntax "_some_set" :: "[set, bool] \<Rightarrow> set" ("(some _. _)" 49)
+translations "some X. P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)"
 
 
 subsection \<open>Injectivity and surjectivity of relations\<close>
 
-definition injective :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<succ> _ injective)")
+definition rel_inj :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<succ> _ injective)")
   where "\<phi>: A \<succ> B injective \<equiv> \<forall>a \<in> A. \<forall>a' \<in> A. (\<exists>b \<in> B. (a \<phi> b) \<and> (a' \<phi> b)) \<longrightarrow> a = a'"
 
-definition surjective :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<succ> _ surjective)")
+definition rel_surj :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<succ> _ surjective)")
   where "\<phi>: A \<succ> B surjective \<equiv> \<forall>b \<in> B. \<exists>a \<in> A. (a \<phi> b)"
 
 
 subsection \<open>Functions\<close>
 
-subsubsection \<open>Quantifiers\<close>
-
 definition fun :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<rightarrow> _)"[51, 0, 51] 50)
   where "f: A \<rightarrow> B \<equiv> f: A \<succ> B \<and> (\<forall>x \<in> A. \<exists>!y \<in> B. (x f y))"
-
-definition all_fun :: "[set, set, rel \<Rightarrow> bool] \<Rightarrow> bool"
-  where "all_fun(A, B, P) \<equiv> ALL f. f: A \<rightarrow> B \<longrightarrow> P(f)"
-
-abbreviation ex_fun :: "[set, set, rel \<Rightarrow> bool] \<Rightarrow> bool"
-  where "ex_fun(A, B, P) \<equiv> EX f. f: A \<rightarrow> B \<and> P(f)"
-
-abbreviation ex1_fun :: "[set, set, rel \<Rightarrow> bool] \<Rightarrow> bool"
-  where "ex1_fun(A, B, P) \<equiv> EX! f. f: A \<rightarrow> B \<and> P(f)"
-
-syntax
-  "_all_fun"  :: "[idt, set, set, bool] \<Rightarrow> bool" ("(\<forall>_: _ \<rightarrow> _./ _)"[0, 0, 0, 10] 11)
-  "_ex_fun"   :: "[idt, set, set, bool] \<Rightarrow> bool" ("(\<exists>_: _ \<rightarrow> _./ _)"[0, 0, 0, 10] 11)
-  "_ex1_fun"  :: "[idt, set, set, bool] \<Rightarrow> bool" ("(\<exists>!_: _ \<rightarrow> _./ _)"[0, 0, 0, 10] 11)
-translations
-  "\<forall>f: A \<rightarrow> B. P"  \<rightleftharpoons> "CONST all_fun(A, B, \<lambda>f. P)"
-  "\<exists>f: A \<rightarrow> B. P"  \<rightleftharpoons> "CONST ex_fun(A, B, \<lambda>f. P)"
-  "\<exists>!f: A \<rightarrow> B. P" \<rightleftharpoons> "CONST ex1_fun(A, B, \<lambda>f. P)"
 
 
 subsubsection \<open>Application\<close>
 
 axiomatization app :: "[rel, elem] \<Rightarrow> elem" (infixl "`" 100)
-  where fun_app_def: "f: A \<rightarrow> B \<Longrightarrow> f`x \<equiv> the (y \<in> B). (x f y)"
+  where app_def: "f: A \<rightarrow> B \<Longrightarrow> f`x \<equiv> the (y \<in> B). (x f y)"
+
+
+subsubsection \<open>Injectivity and surjectivity\<close>
+
+definition fun_inj :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<hookrightarrow> _)")
+  where "f: A \<hookrightarrow> B \<equiv> f: A \<rightarrow> B \<and> (\<forall>a \<in> A. \<forall>a' \<in> A. f`a = f`a' \<longrightarrow> a = a')"
+
+definition fun_surj :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<Rrightarrow> _)")
+  where "f: A \<Rrightarrow> B \<equiv> f: A \<rightarrow> B \<and> (\<forall>b \<in> B. \<exists>a \<in> A. f`a = b)"
+
 
 subsubsection \<open>Rules\<close>
 
 lemma fun_rel: "f: A \<rightarrow> B \<Longrightarrow> f: A \<succ> B"
   unfolding fun_def by auto
 
+lemma fun_uniq_val: "\<lbrakk>f: A \<rightarrow> B; x \<in> A; y \<in> B; y' \<in> B; x f y; x f y'\<rbrakk> \<Longrightarrow> y = y'"
+  unfolding fun_def by blast
+
 lemma fun_uniq_val': "\<lbrakk>f: A \<rightarrow> B; x \<in> A\<rbrakk> \<Longrightarrow> \<exists>!y \<in> B. (x f y)"
   unfolding fun_def by blast
 
-lemma fun_uniq_val:
-  "\<lbrakk>f: A \<rightarrow> B; x \<in> A; y \<in> B; y' \<in> B; x f y; x f y'\<rbrakk> \<Longrightarrow> y = y'"
-  by (auto dest: fun_uniq_val')
+lemma fun_holds: "\<lbrakk>f: A \<rightarrow> B; x \<in> A\<rbrakk> \<Longrightarrow> x f (f`x)"
+  using fun_uniq_val' app_def the_elemI'[where ?P="\<lambda>y. (x f y)"] by auto
 
-lemma fun_graph:
-  assumes "f: A \<rightarrow> B" and "x \<in> A" 
-  shows "x f (f`x)"
-  using assms fun_uniq_val' fun_app_def the_elemI'[where ?P="\<lambda>y. (x f y)"]
-  by auto
+lemma appI: "\<lbrakk>f: A \<rightarrow> B; x \<in> A\<rbrakk> \<Longrightarrow> f`x \<in> B"
+  using fun_rel fun_holds by (intro rel_cod)
 
-lemma appI:
-  assumes "f: A \<rightarrow> B" and "x \<in> A" 
-  shows "f`x \<in> B"
-  using assms fun_rel fun_graph
-  by (intro rel_cod)
+lemma holds_app_iff [iff]: "\<lbrakk>f: A \<rightarrow> B; x \<in> A; y \<in> B\<rbrakk> \<Longrightarrow>(x f y) \<longleftrightarrow> y = f`x"
+  using fun_holds appI fun_uniq_val by auto
 
-lemma holds_app_iff:
-  assumes "f: A \<rightarrow> B" and "x \<in> A" and "y \<in> B"
-  shows "(x f y) \<longleftrightarrow> y = f`x"
-  by (auto intro: assms fun_graph appI fun_uniq_val)
+lemma rel_inj_fun_inj_iff: "f: A \<rightarrow> B \<and> (f: A \<succ> B injective) \<longleftrightarrow> (f: A \<hookrightarrow> B)"
+  by (auto simp: fun_inj_def rel_inj_def fun_holds appI)+
 
 
-text \<open>Injectivity and surjectivity of functions\<close>
-
-definition fun_inj :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<rightarrow> _ injective)")
-  where "f: A \<rightarrow> B injective \<equiv> f: A \<rightarrow> B \<and> (\<forall>a \<in> A. \<forall>a' \<in> A. f`a = f`a' \<longrightarrow> a = a')"
-
-definition fun_surj :: "[rel, set, set] \<Rightarrow> bool" ("(_ : _ \<rightarrow> _ surjective)")
-  where "f: A \<rightarrow> B surjective \<equiv> f: A \<rightarrow> B \<and> (\<forall>b \<in> B. \<exists>a \<in> A. f`a = b)"
-
-lemma fun_inj_implies_rel_inj: "f: A \<rightarrow> B injective \<Longrightarrow> f: A \<succ> B injective"
-  sorry
-
-lemma rel_inj_fun_implies_fun_inj: "\<lbrakk>f: A \<rightarrow> B; f: A \<succ> B injective\<rbrakk> \<Longrightarrow> f: A \<rightarrow> B injective"
-  sorry
-
-
-section \<open>Axioms\<close>
-
-axiomatization where
-
-  existence: "\<exists>X. EX x. x \<in> X" and
-
-  rel_comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x \<in> A. \<forall>y \<in> B. (x \<phi> y) \<longleftrightarrow> P(x, y)"
+subsection \<open>Tabulations\<close>
 
 text \<open>
 A tabulation is a reflection of relations into sets.
-The third axiom states that tabulations exist.
+It is used in the statement of the third axiom.
 \<close>
 
-abbreviation (input) is_tabulation_of :: "[set, rel, rel, rel, set, set] \<Rightarrow> bool"
-  ("(_, _, _ is'_tabulation'_of _ : _ \<succ> _)")
-where
-  "T, f1, f2 is_tabulation_of \<phi>: A \<succ> B \<equiv>
+definition tabulates :: "[set, rel, rel, rel, set, set] \<Rightarrow> bool" ("(_, _, _ tabulates _ : _ \<succ> _)")
+  where "T, f1, f2 tabulates \<phi>: A \<succ> B \<equiv>
     f1: T \<rightarrow> A \<and>
     f2: T \<rightarrow> B \<and>
-    (\<forall>x \<in> A. \<forall>y \<in> B. \<phi>(x, y) \<longleftrightarrow> (\<exists>t \<in> T. f1[t] = x \<and> f2[t] = y)) \<and>
-    (\<forall>s \<in> T. \<forall>t \<in> T. f1[s] = f1[t] \<and> f2[s] = f2[t] \<longrightarrow> s = t)"
+    (\<forall>x \<in> A. \<forall>y \<in> B. (x \<phi> y) \<longleftrightarrow> (\<exists>t \<in> T. f1`t = x \<and> f2`t = y)) \<and>
+    (\<forall>s \<in> T. \<forall>t \<in> T. f1`s = f1`t \<and> f2`s = f2`t \<longrightarrow> s = t)"
+
+lemma tabulatesD1:
+  "\<lbrakk>T, f1, f2 tabulates \<phi>: A \<succ> B; x \<in> A; y \<in> B\<rbrakk> \<Longrightarrow> (x \<phi> y) \<longleftrightarrow> (\<exists>t \<in> T. f1`t = x \<and> f2`t = y)"
+  unfolding tabulates_def by blast
+
+lemma tabulatesD2:
+  "\<lbrakk>T, f1, f2 tabulates \<phi>: A \<succ> B; s \<in> T; t \<in> T\<rbrakk> \<Longrightarrow> f1`s = f1`t \<and> f2`s = f2`t \<longrightarrow> s = t"
+  unfolding tabulates_def by auto
+
+lemma tabulates_appI: "\<lbrakk>T, f1, f2 tabulates \<phi>: A \<succ> B; r \<in> T\<rbrakk> \<Longrightarrow> f1`r \<in> A \<and> f2`r \<in> B"
+  unfolding tabulates_def using appI by auto
+
+lemma tabulates_holds: "\<lbrakk>T, f1, f2 tabulates \<phi>: A \<succ> B; r \<in> T\<rbrakk> \<Longrightarrow> (f1`r) \<phi> (f2`r)"
+  by (subst tabulatesD1) (insert tabulates_appI, blast+)
+
+
+section \<open>Axioms part I\<close>
+
+text \<open>
+A somewhat pedantic comment on logical issues—in HOL all types are inhabited, which in particular
+means that there already exists a set; we do not have to postulate this.
+Thus our version of SEAR's ``existence'' axiom simply states that there exists a *nonempty* set.
+\<close>
+
+axiomatization where
+
+  nonempty_ex: "\<exists>X. EX x. x \<in> X" and
+  \<comment>\<open>This should be the only place in our formalization where we use an unrestricted quantifier!\<close>
+
+  rel_comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x \<in> A. \<forall>y \<in> B. (x \<phi> y) \<longleftrightarrow> P(x, y)"
+
 
 axiomatization
   tab :: "rel \<Rightarrow> set" ("|_|") and
   fst :: "rel \<Rightarrow> rel" ("|_|\<^sub>1") and
-  snd :: "rel \<Rightarrow> rel" ("|_|\<^sub>2") where
+  snd :: "rel \<Rightarrow> rel" ("|_|\<^sub>2")
 
-  tabulation: "\<forall>\<phi>: A \<succ> B. |\<phi>|, |\<phi>|\<^sub>1, |\<phi>|\<^sub>2 is_tabulation_of \<phi>: A \<succ> B"
+  where tabulation: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|, |\<phi>|\<^sub>1, |\<phi>|\<^sub>2 tabulates \<phi>: A \<succ> B"
 
-corollary fst_is_fun: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>1: |\<phi>| \<rightarrow> A" using tabulation by auto
 
-corollary snd_is_fun: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>2: |\<phi>| \<rightarrow> B" using tabulation by auto
+corollary fst_fun: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>1: |\<phi>| \<rightarrow> A"
+  using tabulation unfolding tabulates_def by auto
 
-corollary tab_sufficient:
-  "\<phi>: A \<succ> B \<Longrightarrow> \<forall>x \<in> A. \<forall>y \<in> B. \<phi>(x, y) \<longleftrightarrow> (\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1[r] = x \<and> |\<phi>|\<^sub>2[r] = y)"
-    using tabulation by auto
+corollary snd_fun: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>2: |\<phi>| \<rightarrow> B"
+  using tabulation unfolding tabulates_def by auto
 
-corollary tab_minimal:
-  "\<phi>: A \<succ> B \<Longrightarrow> \<forall>r \<in> |\<phi>|. \<forall>s \<in> |\<phi>|. |\<phi>|\<^sub>1[r] = |\<phi>|\<^sub>1[s] \<and> |\<phi>|\<^sub>2[r] = |\<phi>|\<^sub>2[s] \<longrightarrow> r = s"
-    using tabulation by blast
+corollary tab_holds: "\<lbrakk>\<phi>: A \<succ> B; r \<in> |\<phi>|\<rbrakk> \<Longrightarrow> (|\<phi>|\<^sub>1`r) \<phi> (|\<phi>|\<^sub>2`r)"
+  using tabulation tabulates_holds by blast
+
+
+section \<open>Relations\<close>
+
+text \<open>
+Functionality for defining relations by writing \<open>relation "\<phi>: A \<succ> B" where "a \<phi> b = P(a, b)"\<close>.
+\<close>
+
+ML \<open>
+Outer_Syntax.local_theory @{command_keyword relation} "Define a relation"
+let
+  val parser = Parse.term -- (Parse.where_ |-- Parse.prop)
+
+  fun dest_rel_term tm = case tm of
+      @{const "rel_of"} $ rel $ dom $ cod => (rel, dom, cod)
+    | _ => error "Error parsing relation"
+
+  (* Process a definition of the form "(a \<phi> b) = P(a, b)" for a relation with
+     given domain and codomain.
+     Return a pair of terms which are used to define the relation and generated theorems. *)
+  fun process_def lthy rel dom cod prop = case prop of
+        @{const HOL.eq (bool)} $ (@{const "holds"} $ rel' $ var1 $ var2) $ cond =>
+          let
+            val _ = if not (rel aconv rel')
+              then error ("Not a definition for \"" ^ ((Pretty.string_of o Syntax.pretty_term lthy) rel) ^ "\"") else ""
+
+            val (var1name, var2name) = apply2 Term.term_name (var1, var2)
+
+            val def = Abs ("\<phi>", @{typ "rel"}, Term.abstract_over (rel,
+              @{const "all_elem"} $ dom $ Abs (var1name, @{typ "elem"},
+                Term.abstract_over (var1,
+                  @{const "all_elem"} $ cod $ Abs (var2name, @{typ "elem"},
+                    Term.abstract_over (var2, prop))))))
+
+            val cond' = Abs (var1name, @{typ "elem"},
+              Term.abstract_over (var1,
+                Abs (var2name, @{typ "elem"},
+                  Term.abstract_over (var2, cond))))
+          in
+            (def, cond')
+          end
+      | _ => error "Definition not accepted"
+
+  fun define_relation lthy rel_name dom cod def_tm =
+    let
+      val defined_tm = @{const "the_rel"} $ dom $ cod $ def_tm
+    in
+      Local_Theory.define (
+        (Binding.qualified_name rel_name, NoSyn),
+        ((Binding.qualified_name (rel_name ^ "_def"), []), defined_tm)
+      ) lthy
+    end
+
+  fun gen_thms lthy rel_name dom cod rel_cond_tm rel_def_thm =
+    let
+      val (rel_prop_thm, rel_sort_thm) = apply2 (fn th =>
+        (Object_Logic.rulify lthy o Local_Defs.fold lthy [rel_def_thm]) (
+          th OF [Thm.instantiate
+            ( [],
+              [
+                ((("A", 0), @{typ set}), Thm.cterm_of lthy dom),
+                ((("B", 0), @{typ set}), Thm.cterm_of lthy cod),
+                ((("P", 0), @{typ "elem \<Rightarrow> elem \<Rightarrow> bool"}), Thm.cterm_of lthy rel_cond_tm)
+              ] )
+            @{thm rel_comprehension}
+          ])
+        ) (@{thm the_relI'}, @{thm the_rel_sort'})
+    in
+      lthy |>
+        Local_Theory.notes [
+          ((Binding.qualified_name (rel_name ^ "_sort"), @{attributes [intro!]}),
+            [([rel_sort_thm], [])]),
+          ((Binding.qualified_name (rel_name ^ "_prop"), @{attributes [iff]}),
+            [([rel_prop_thm], [])])
+        ]
+    end
+
+  fun relation_cmd (relstr, defstr) lthy =
+    let
+      val (rel, dom, cod) = dest_rel_term (Syntax.read_term lthy relstr)
+
+      val _ = (@{print} rel; @{print} dom; @{print} cod)
+
+      val rel_name = Term.term_name rel
+      val (rel_def, rel_cond) = process_def lthy rel dom cod (Syntax.read_term lthy defstr)
+      val ((defined_rel, (_, rel_def_thm)), lthy) = define_relation lthy rel_name dom cod rel_def
+      val ((_, sort_thm::_)::(_, prop_thm::_)::_, lthy') = gen_thms lthy rel_name dom cod rel_cond rel_def_thm
+    in
+      writeln ("relation\n  " ^ (Term.term_name defined_rel) ^ " :: " ^
+        (Syntax.string_of_typ lthy' (Term.type_of defined_rel)));
+      Output.information ("lemma " ^ rel_name ^ "_sort:\n  " ^
+        ((Pretty.string_of o Syntax.pretty_term lthy' o Thm.prop_of) sort_thm));
+      Output.information ("lemma " ^ rel_name ^ "_prop:\n  " ^
+        ((Pretty.string_of o Syntax.pretty_term lthy' o Thm.prop_of) prop_thm));
+      lthy'
+    end
+in
+  parser >> relation_cmd
+end
+\<close>
+
+relation "\<phi>(A, B): A \<succ> B" where "(a \<phi>(A) b) \<longleftrightarrow> a \<in> A \<and> b \<in> B"
 
 
 section \<open>Basic definitions and results\<close>
 
 subsection \<open>Function extensionality\<close>
 
-lemma fun_ext: "\<forall>f: A \<rightarrow> B. \<forall>g: A \<rightarrow> B. (\<forall>x \<in> A. f[x] = g[x]) \<longrightarrow> f = g"
+lemma fun_ext:
+  assumes "f: A \<rightarrow> B" and "g: A \<rightarrow> B" and "\<forall>x \<in> A. f`x = g`x"
+  shows "f = g"
 proof -
-  { fix f g :: rel assume
-  f_fun: "f: A \<rightarrow> B" and
-  g_fun: "g: A \<rightarrow> B" and
-  ptwise_eq: "\<forall>x \<in> A. f[x] = g[x]"
-
-  have lemma_1:
-  "\<forall>x \<in> A. \<forall>y \<in> B. f(x, y) \<longleftrightarrow> g(x, y)"
-  proof -
-    { fix x y assume
-    x_elem: "x \<in> A" and
-    y_elem: "y \<in> B"
-    hence "f(x, y) \<longleftrightarrow> y = f[x]"
-      using holds_fun_app_equiv f_fun by auto
-    moreover have "y = g[x] \<longleftrightarrow> g(x, y)"
-      using holds_fun_app_equiv g_fun x_elem y_elem by auto
-    ultimately have "f(x, y) \<longleftrightarrow> g(x, y)"
-      using ptwise_eq x_elem by simp
-    }
-    thus ?thesis by auto
-  qed
-
-  have easy_observation:
-  "\<forall>x \<in> A. \<forall>y \<in> B. g(x, y) \<longleftrightarrow> g(x, y)"
-    by simp
-
-  with rel_comprehension[where P="\<lambda>x y. g(x, y)"] lemma_1 have
-  "f = g"
-    using f_fun g_fun by blast
-  }
-  thus ?thesis by auto
+  have "\<forall>x \<in> A. \<forall>y \<in> B. (x f y) \<longleftrightarrow> (x g y)"
+    by (auto intro: assms(1-2) simp: holds_app_iff[OF assms(1)] assms(3)[rule_format])
+  thus "f = g"
+    using rel_comprehension[where P="\<lambda>x y. (x g y)"] assms(1-2) fun_def by blast
 qed
 
 
 subsection \<open>Empty and singleton sets\<close>
 
-theorem emptyset_exists: "\<exists>X. \<forall>x \<in> X. x \<notin> X"
+theorem emptyset_ex: "\<exists>X. \<forall>x \<in> X. x \<notin> X"
 proof -
-  from existence obtain a A where "a \<in> A" by auto
+  obtain \<phi> where "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<not>(x \<phi> y)"
+    using rel_comprehension[of A A "\<lambda>_ _. False"] by blast
 
-  from rel_comprehension[of A A "\<lambda>_ _. False"] obtain \<phi> where
-  \<phi>_rel: "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<not>\<phi>(x, y)"
-    by auto
-  with tabulation have
-  lemma_1: "\<forall>x \<in> A. \<forall>y \<in> A. \<not>(\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1[r] = x \<and> |\<phi>|\<^sub>2[r] = y)"
-    by auto
+  hence *: "\<forall>x \<in> A. \<forall>y \<in> A. \<not>(\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1`r = x \<and> |\<phi>|\<^sub>2`r = y)"
+    using tabulatesD1 tabulation[of \<phi> A A] by auto
 
   have "\<forall>r \<in> |\<phi>|. r \<notin> |\<phi>|"
-  proof -
-    { fix r assume for_contradiction: "r \<in> |\<phi>|"
-    then have "|\<phi>|\<^sub>1[r] \<in> A" and "|\<phi>|\<^sub>2[r] \<in> A"
-      using
-        fst_is_fun[OF \<phi>_rel]
-        snd_is_fun[OF \<phi>_rel]
-        fun_image_elem_of
-      by auto
-    hence
-    nonexistence: "\<not>(\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1[r'] = |\<phi>|\<^sub>1[r] \<and> |\<phi>|\<^sub>2[r'] = |\<phi>|\<^sub>2[r])"
-      using lemma_1 by auto
-
-    from for_contradiction have
-    "\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1[r'] = |\<phi>|\<^sub>1[r] \<and> |\<phi>|\<^sub>2[r'] = |\<phi>|\<^sub>2[r]"
-      by auto
-
-    hence False using nonexistence by auto
-    }
-    thus "\<forall>x \<in> |\<phi>|. x \<notin> |\<phi>|"
-      by auto
-  qed
-  thus ?thesis ..
+  proof auto
+    fix r assume "r \<in> |\<phi>|"
+    then have "|\<phi>|\<^sub>1`r \<in> A" and "|\<phi>|\<^sub>2`r \<in> A" and "\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1`r' = |\<phi>|\<^sub>1`r \<and> |\<phi>|\<^sub>2`r' = |\<phi>|\<^sub>2`r"
+      by (auto intro: fst_fun snd_fun appI \<open>\<phi>: A \<succ> A\<close>)
+    thus False using * by auto
+  qed thus ?thesis ..
 qed
 
-theorem singleton_exists: "\<exists>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
+theorem singleton_ex: "\<exists>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
 proof -
-  from existence obtain a A where
-  a_in_A: "a \<in> A" by auto
+  obtain a A where "a \<in> A" using nonempty_ex by blast
+  obtain \<phi> where 1: "\<phi>: A \<succ> A" and 2: "\<forall>x \<in> A. \<forall>y \<in> A. (x \<phi> y) \<longleftrightarrow> x = a \<and> y = a"
+    using rel_comprehension[of A A "\<lambda>x y. x = a \<and> y = a"] by blast
 
-  from rel_comprehension[of A A "\<lambda>x y. x = a \<and> y = a"]
-  obtain \<phi> where
-  \<phi>_rel: "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<phi>(x, y) \<longleftrightarrow> x = a \<and> y = a"
-    by auto
-  with tabulation have
-  lemma_1: "\<forall>x \<in> A. \<forall>y \<in> A. x = a \<and> y = a \<longleftrightarrow> (\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1[r] = x \<and> |\<phi>|\<^sub>2[r] = y)"
-    by auto
-  then obtain r where
-  r_elem: "r \<in> |\<phi>|" and "|\<phi>|\<^sub>1[r] = a \<and> |\<phi>|\<^sub>2[r] = a"
-    using a_in_A by auto
+  hence 3: "\<forall>r \<in> |\<phi>|. |\<phi>|\<^sub>1`r = a \<and> |\<phi>|\<^sub>2`r = a"
+    by (auto intro: fst_fun snd_fun appI tabulation tab_holds)
 
-  have "\<forall>r \<in> |\<phi>|. |\<phi>|\<^sub>1[r] = a \<and> |\<phi>|\<^sub>2[r] = a"
-  proof -
-    { fix r assume r_elem: "r \<in> |\<phi>|"
-    then have "|\<phi>|\<^sub>1[r] \<in> A" and "|\<phi>|\<^sub>2[r] \<in> A"
-      using
-        fst_is_fun[OF \<phi>_rel]
-        snd_is_fun[OF \<phi>_rel]
-        fun_image_elem_of
-      by auto
-    with lemma_1 have "|\<phi>|\<^sub>1[r] = a \<and> |\<phi>|\<^sub>2[r] = a"
-      using r_elem by auto
-    }
-    thus ?thesis by auto
-  qed
+  obtain r where "r \<in> |\<phi>|" using 2 tabulatesD1[OF tabulation[OF 1], of a a] \<open>a \<in> A\<close> by auto
+  then have "\<forall>s \<in> |\<phi>|. r = s" using 3 tabulatesD2[OF tabulation[OF 1]] by auto
 
-  with tab_minimal[OF \<phi>_rel] have "\<forall>s \<in> |\<phi>|. r = s" using r_elem by auto
-  thus ?thesis using r_elem by auto
+  thus ?thesis using \<open>r \<in> |\<phi>|\<close> by auto
 qed
 
 text \<open>Fix particular choices of empty and singleton set.\<close>
 
 definition emptyset :: set ("\<emptyset>")
-  where "\<emptyset> \<equiv> \<epsilon>set X | \<forall>x \<in> X. x \<notin> X"
+  where "\<emptyset> \<equiv> some X. \<forall>x \<in> X. x \<notin> X"
+
+theorem emptysetI: "\<forall>x \<in> \<emptyset>. x \<notin> \<emptyset>"
+  unfolding emptyset_def using emptyset_ex some_setI[of "\<lambda>X. \<forall>x \<in> X. x \<notin> X"] by auto
+
+theorem vacuous: "\<forall>x \<in> \<emptyset>. P(x)"
+  using emptysetI by blast
 
 definition singleton :: set ("\<one>")
-  where "\<one> \<equiv> \<epsilon>set X | \<exists>x \<in> X. \<forall>y \<in> X. y = x"
+  where "\<one> \<equiv> some X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
 
-theorem emptyset_prop: "\<forall>x \<in> \<emptyset>. x \<notin> \<emptyset>"
-  using emptyset_exists emptyset_def some_set_def[of "\<lambda>X. \<forall>x \<in> X. x \<notin> X"]
-  by auto
-
-theorem vacuous: "\<forall>x \<in> \<emptyset>. P x"
-proof -
-  { fix x assume assm: "x \<in> \<emptyset>"
-  hence "x \<notin> \<emptyset>" using emptyset_prop by auto
-  hence "P x" using assm by auto
-  }
-  thus ?thesis by auto
-qed
-
-theorem singleton_prop: "\<exists>x \<in> \<one>. \<forall>y \<in> \<one>. y = x"
-  using singleton_exists singleton_def some_set_def[of "\<lambda>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"]
-  by auto
+theorem singletonI: "\<exists>x \<in> \<one>. \<forall>y \<in> \<one>. y = x"
+  unfolding singleton_def using singleton_ex some_setI[of "\<lambda>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"] by auto
 
 lemma singleton_all_eq: "\<forall>x \<in> \<one>. \<forall>y \<in> \<one>. x = y"
-proof -
-  from singleton_prop obtain pt where lemma_1:
-  "\<forall>x \<in> \<one>. pt = x" by auto
-  { fix x y assume "x \<in> \<one>" and "y \<in> \<one>"
-  with lemma_1 have "pt = x" and "pt = y" by auto
-  hence "x = y" by simp
-  }
-  thus ?thesis by auto
-qed
+  using singletonI by blast
 
+text \<open>The unique function into the singleton \<one>\<close>
 
-subsection \<open>The unique function into the singleton \<one>\<close>
-
-lemma singleton_terminal: "EX! f. f: X \<rightarrow> \<one>"
-proof
-  from singleton_prop
-  obtain pt where
-  pt_elem: "pt \<in> \<one>"
-    by auto
-  from rel_comprehension[of X \<one> "\<lambda>_ y. y = pt"]
-  obtain f where
-  f_rel: "f: X \<succ> \<one>" and
-  f_def: "\<forall>x \<in> X. \<forall>y \<in> \<one>. f(x, y) \<longleftrightarrow> y = pt"
-    by auto
-  thus "EX f. f: X \<rightarrow> \<one>"
-    using pt_elem by blast
-
-  fix f g assume
-  f_fun: "f: X \<rightarrow> \<one>" and
-  g_fun: "g: X \<rightarrow> \<one>"
-  have
-  "\<forall>x \<in> X. f[x] = g[x]"
-    using
-      fun_image_elem_of[OF f_fun]
-      fun_image_elem_of[OF g_fun]
-      singleton_all_eq
-    by auto
-  with fun_ext show "f = g"
-    using f_fun g_fun by auto
+lemma singleton_terminal: "\<exists>!f: X \<succ> \<one>. f: X \<rightarrow> \<one>"
+proof (auto intro: fun_ext appI singleton_all_eq[rule_format])
+  obtain pt where "pt \<in> \<one>" using singletonI by auto
+  obtain f where 1: "f: X \<succ> \<one>" and 2: "\<forall>x \<in> X. \<forall>y \<in> \<one>. (x f y) \<longleftrightarrow> y = pt"
+    using rel_comprehension[of X \<one> "\<lambda>_ y. y = pt"] by blast
+  then have "f: X \<rightarrow> \<one>" unfolding fun_def using \<open>pt \<in> \<one>\<close> 2[rule_format] by auto
+  thus "\<exists>f: X \<succ> \<one>. f: X \<rightarrow> \<one>" using 1 by auto
 qed
 
 definition terminal :: "set \<Rightarrow> rel" ("(terminal\<^bsub>_\<^esub>)")
-  where "terminal\<^bsub>X\<^esub> \<equiv> \<iota>rel f: X \<succ> \<one> | (f: X \<rightarrow> \<one>)"
+  where "terminal\<^bsub>X\<^esub> \<equiv> the (f: X \<succ> \<one>). f: X \<rightarrow> \<one>"
 
-lemma terminal_well_def: "terminal\<^bsub>X\<^esub>: X \<rightarrow> \<one>"
-  unfolding terminal_def
-  using
-    the_rel_sat[of X \<one> "\<lambda>f. f: X \<rightarrow> \<one>"]
-    singleton_terminal
-  by auto
+lemma terminal_welldef: "terminal\<^bsub>X\<^esub>: X \<rightarrow> \<one>"
+  unfolding terminal_def using singleton_terminal the_relI'[where ?P="\<lambda>f. f: X \<rightarrow> \<one>"] by auto
 
-lemma terminal_constant: "\<forall>x \<in> X. \<forall>y \<in> X. terminal\<^bsub>X\<^esub>[x] = terminal\<^bsub>X\<^esub>[y]"
-  using
-    terminal_well_def[of X]
-    fun_image_elem_of
-    singleton_all_eq
-  by blast
+lemma terminal_constant: "\<forall>x \<in> X. \<forall>y \<in> X. terminal\<^bsub>X\<^esub>`x = terminal\<^bsub>X\<^esub>`y"
+  using terminal_welldef appI singleton_all_eq by blast
 
 
 subsection \<open>Subsets\<close>
 
-text \<open>
-Differently from Shulman, we define subsets as tabulations satisfying certain properties.
-\<close>
+definition subset :: "[rel, set] \<Rightarrow> bool" (infix "\<subseteq>" 50)
+  where "S \<subseteq> A \<equiv> S: \<one> \<succ> A"
 
-definition subset_of :: "[set, set] \<Rightarrow> bool" (infix "\<subseteq>" 50)
-  where "B \<subseteq> A \<equiv>
-    \<exists>S: \<one> \<succ> A. EX i. (i: B \<rightarrow> A injective) \<and> (\<forall>pt \<in> \<one>. \<forall>a \<in> A. S(pt, a) \<longleftrightarrow> (\<exists>b \<in> B. i[b] = a))"
+relation "test: \<one> \<succ> \<emptyset>" where "(a test b) = (a = b)"
 
-lemma subsets_are_tabulations:
-  "B \<subseteq> A \<Longrightarrow> \<exists>S: \<one> \<succ> A. \<exists>i: B \<rightarrow> A. (B, terminal\<^bsub>B\<^esub>, i is_tabulation_of S: \<one> \<succ> A)" and
-  "\<exists>S: \<one> \<succ> A. \<exists>i: B \<rightarrow> A. (B, terminal\<^bsub>B\<^esub>, i is_tabulation_of S: \<one> \<succ> A) \<Longrightarrow> B \<subseteq> A"
-proof -
-  assume B_subset_of_A: "B \<subseteq> A"
-  then show "\<exists>S: \<one> \<succ> A. \<exists>i: B \<rightarrow> A. (B, terminal\<^bsub>B\<^esub>, i is_tabulation_of S: \<one> \<succ> A)"
-  proof -
-    have auxiliary_lemma:
-    "\<forall>i: B \<rightarrow> A. \<forall>pt \<in> \<one>. \<forall>a \<in> A. (\<exists>b \<in> B. i[b] = a) \<longleftrightarrow> (\<exists>b \<in> B. terminal\<^bsub>B\<^esub>[b] = pt \<and> i[b] = a)"
-    proof -
-      { fix i pt a assume
-      pt_elem: "pt \<in> \<one>"
+relation "empty(X): \<one> \<succ> X" where "(a empty(X) x) \<longleftrightarrow> False"
 
-      have \<Longrightarrow>: "(\<exists>b \<in> B. i[b] = a) \<Longrightarrow> (\<exists>b \<in> B. terminal\<^bsub>B\<^esub>[b] = pt \<and> i[b] = a)"
-      proof -
-        assume a_in_range_of_i: "\<exists>b \<in> B. i[b] = a"
-        then obtain b where
-        b_elem: "b \<in> B" and
-        b_mapsto_a: "i[b] = a"
-          by auto
-        have
-        "terminal\<^bsub>B\<^esub>[b] = pt"
-          using
-            fun_image_elem_of[OF terminal_well_def b_elem]
-            pt_elem
-            singleton_all_eq
-          by auto
-        thus "\<exists>b \<in> B. terminal\<^bsub>B\<^esub>[b] = pt \<and> i[b] = a"
-          using b_elem b_mapsto_a by auto
-      qed
-      moreover have \<Longleftarrow>: "(\<exists>b \<in> B. terminal\<^bsub>B\<^esub>[b] = pt \<and> i[b] = a) \<Longrightarrow> (\<exists>b \<in> B. i[b] = a)"
-        by auto
-      ultimately have "(\<exists>b \<in> B. i[b] = a) \<longleftrightarrow> (\<exists>b \<in> B. terminal\<^bsub>B\<^esub>[b] = pt \<and> i[b] = a)" ..
-      }
-      thus ?thesis by auto
-    qed
 
-    from B_subset_of_A obtain S and i where
-    S_rel: "S: \<one> \<succ> A" and
-    i_inj: "i: B \<rightarrow> A injective" and
-    lemma_1: "\<forall>pt \<in> \<one>. \<forall>a \<in> A. S(pt, a) \<longleftrightarrow> (\<exists>b \<in> B. i[b] = a)"
-      unfolding subset_of_def by auto
-
-    have i_fun: "i: B \<rightarrow> A" by (fact conjunct1[OF i_inj[unfolded fun_inj_def]])
-
-    moreover have sufficiency:
-    "\<forall>pt \<in> \<one>. \<forall>a \<in> A. S(pt, a) \<longleftrightarrow> (\<exists>b \<in> B. terminal\<^bsub>B\<^esub>[b] = pt \<and> i[b] = a)"
-    proof -
-      { fix pt a assume
-      pt_elem: "pt \<in> \<one>" and
-      a_elem: "a \<in> A"
-  
-      with lemma_1 have
-      "S(pt, a) \<longleftrightarrow> (\<exists>b \<in> B. i[b] = a)"
-        by auto
-      with auxiliary_lemma[rule_format, of i pt a] have
-      "S(pt, a) \<longleftrightarrow> (\<exists>b \<in> B. terminal\<^bsub>B\<^esub>[b] = pt \<and> i[b] = a)"
-        using i_fun pt_elem a_elem
-        by auto
-      }
-      thus ?thesis by auto
-    qed
-
-    moreover have minimality:
-    "\<forall>b \<in> B. \<forall>b' \<in> B. terminal\<^bsub>B\<^esub>[b] = terminal\<^bsub>B\<^esub>[b'] \<and> i[b] = i[b'] \<longrightarrow> b = b'"
-    proof -
-      { fix b b' assume
-      b_elem: "b \<in> B" and
-      b'_elem: "b' \<in> B"
-      then have "terminal\<^bsub>B\<^esub>[b] = terminal\<^bsub>B\<^esub>[b'] \<and> i[b] = i[b'] \<longrightarrow> b = b'"
-        using
-          conjunct2[OF i_inj[unfolded fun_inj_def]]
-          terminal_constant
-        by blast
-      }
-      thus ?thesis by auto
-    qed
-
-    ultimately have "B, terminal\<^bsub>B\<^esub>, i is_tabulation_of S: \<one> \<succ> A"
-      using terminal_well_def by auto
-
-    thus ?thesis using S_rel by auto
-  qed
-
-  next assume "\<exists>S: \<one> \<succ> A. \<exists>i: B \<rightarrow> A. (B, terminal\<^bsub>B\<^esub>, i is_tabulation_of S: \<one> \<succ> A)"
-  show "B \<subseteq> A" unfolding subset_of_def
-    
-    sorry
-qed
 
 
 end
