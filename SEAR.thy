@@ -460,13 +460,13 @@ lemmas [elim?] =
   the_rel_sort'
 
 
-subsection \<open>Indefinite description for sets\<close>
+(* subsection \<open>Indefinite description for sets\<close>
 
 axiomatization some_set :: "(set \<Rightarrow> bool) \<Rightarrow> set"
   where some_setI: "\<exists>X. P(X) \<Longrightarrow> P(some_set(\<lambda>X. P(X)))"
 
 syntax "_some_set" :: "[set, bool] \<Rightarrow> set" ("(some _. _)" 49)
-translations "some X. P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)"
+translations "some X. P" \<rightleftharpoons> "CONST some_set (\<lambda>X. P)" *)
 
 
 subsection \<open>Injectivity and surjectivity of relations\<close>
@@ -554,35 +554,25 @@ lemma tabulates_holds: "\<lbrakk>T, f1, f2 tabulates \<phi>: A \<succ> B; r \<in
 
 section \<open>Axioms part I\<close>
 
-text \<open>
-A somewhat pedantic comment on logical issues—in HOL all types are inhabited, which in particular
-means that there already exists a set; we do not have to postulate this.
-Thus our version of SEAR's ``existence'' axiom simply states that there exists a *nonempty* set.
-\<close>
-
-axiomatization where
-
-  nonempty_ex: "\<exists>X. EX x. x \<in> X" and
-  \<comment>\<open>This should be the only place in our formalization where we use an unrestricted quantifier!\<close>
-
-  rel_comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x \<in> A. \<forall>y \<in> B. (x \<phi> y) \<longleftrightarrow> P(x, y)"
-
-
 axiomatization
-  tab :: "rel \<Rightarrow> set" ("|_|") and
-  fst :: "rel \<Rightarrow> rel" ("|_|\<^sub>1") and
-  snd :: "rel \<Rightarrow> rel" ("|_|\<^sub>2")
+  elem :: elem and
+  set  :: set and
+  tab  :: "rel \<Rightarrow> set" ("|_|") and
+  fst  :: "rel \<Rightarrow> rel" ("|_|\<^sub>1") and
+  snd  :: "rel \<Rightarrow> rel" ("|_|\<^sub>2")
+where
+  nontrivial: "elem \<in> set" and
+  rel_comprehension: "\<exists>!\<phi>: A \<succ> B. \<forall>x \<in> A. \<forall>y \<in> B. (x \<phi> y) \<longleftrightarrow> P(x, y)" and
+  tabulation: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|, |\<phi>|\<^sub>1, |\<phi>|\<^sub>2 tabulates \<phi>: A \<succ> B"
 
-  where tabulation: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|, |\<phi>|\<^sub>1, |\<phi>|\<^sub>2 tabulates \<phi>: A \<succ> B"
 
-
-corollary fst_fun: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>1: |\<phi>| \<rightarrow> A"
+lemma fst_fun: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>1: |\<phi>| \<rightarrow> A"
   using tabulation unfolding tabulates_def by auto
 
-corollary snd_fun: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>2: |\<phi>| \<rightarrow> B"
+lemma snd_fun: "\<phi>: A \<succ> B \<Longrightarrow> |\<phi>|\<^sub>2: |\<phi>| \<rightarrow> B"
   using tabulation unfolding tabulates_def by auto
 
-corollary tab_holds: "\<lbrakk>\<phi>: A \<succ> B; r \<in> |\<phi>|\<rbrakk> \<Longrightarrow> (|\<phi>|\<^sub>1`r) \<phi> (|\<phi>|\<^sub>2`r)"
+lemma tab_holds: "\<lbrakk>\<phi>: A \<succ> B; r \<in> |\<phi>|\<rbrakk> \<Longrightarrow> (|\<phi>|\<^sub>1`r) \<phi> (|\<phi>|\<^sub>2`r)"
   using tabulation tabulates_holds by blast
 
 
@@ -745,6 +735,12 @@ qed
 
 
 section \<open>Empty and singleton sets\<close>
+
+relation "emptyrel: set \<succ> set" where "(x emptyrel y) \<longleftrightarrow> False"
+
+definition emptyset :: set ("\<emptyset>") where "\<emptyset> \<equiv> |emptyrel|"
+
+(* etc *)
 
 lemma emptyset_ex: "\<exists>X. \<forall>x \<in> X. x \<notin> X"
 proof -
