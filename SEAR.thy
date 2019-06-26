@@ -845,27 +845,27 @@ abbreviation not_elem_subset :: "[elem, rel] \<Rightarrow> bool" (infix "\<notin
 
 \<comment>\<open>Lots of overloading; may have to fix this later.\<close>
 
+lemmas [iff] =
+  subset_def
+  elem_subset_def
+
 
 subsection \<open>Empty and improper subsets\<close>
 
 relation "emptysub(X): \<one> \<succ> X" where "(a emptysub x) \<longleftrightarrow> False"
 notation emptysub ("\<emptyset>")
 
-lemma emptysub_subsetI: "\<emptyset>(X) \<subseteq> X"
-  unfolding subset_def ..
+lemma emptysub_subsetI: "\<emptyset>(X) \<subseteq> X" by auto
 
-lemma emptysub_empty: "\<forall>x \<in> X. x \<notin> \<emptyset>(X)"
-  unfolding elem_subset_def by auto
+lemma emptysub_empty: "\<forall>x \<in> X. x \<notin> \<emptyset>(X)" by auto
 
 
 relation "impropersub(X): \<one> \<succ> X" where "(a impropersub x) \<longleftrightarrow> True"
 notation impropersub ("whole")
 
-lemma impropersub_subsetI: "whole(X) \<subseteq> X"
-  unfolding subset_def ..
+lemma impropersub_subsetI: "whole(X) \<subseteq> X" by auto
 
-lemma impropersub_full: "\<forall>x \<in> X. x \<in> whole(X)"
-  unfolding elem_subset_def by auto
+lemma impropersub_full: "\<forall>x \<in> X. x \<in> whole(X)" by auto
 
 
 \<comment>\<open>Work in progress!\<close>
