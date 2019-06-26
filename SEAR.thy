@@ -738,71 +738,54 @@ section \<open>Empty and singleton sets\<close>
 
 relation "emptyrel: set \<succ> set" where "(x emptyrel y) \<longleftrightarrow> False"
 
-definition emptyset :: set ("\<emptyset>") where "\<emptyset> \<equiv> |emptyrel|"
+definition emptyset ("\<emptyset>") where "\<emptyset> \<equiv> |emptyrel|"
 
-(* etc *)
-
-lemma emptyset_ex: "\<exists>X. \<forall>x \<in> X. x \<notin> X"
-proof -
-  obtain \<phi> where "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<not>(x \<phi> y)"
-    using rel_comprehension[of A A "\<lambda>_ _. False"] by blast
-
-  hence *: "\<forall>x \<in> A. \<forall>y \<in> A. \<not>(\<exists>r \<in> |\<phi>|. |\<phi>|\<^sub>1`r = x \<and> |\<phi>|\<^sub>2`r = y)"
-    using tabulatesD1 tabulation[of \<phi> A A] by auto
-
-  have "\<forall>r \<in> |\<phi>|. r \<notin> |\<phi>|"
-  proof auto
-    fix r assume "r \<in> |\<phi>|"
-    then have "|\<phi>|\<^sub>1`r \<in> A" and "|\<phi>|\<^sub>2`r \<in> A" and "\<exists>r' \<in> |\<phi>|. |\<phi>|\<^sub>1`r' = |\<phi>|\<^sub>1`r \<and> |\<phi>|\<^sub>2`r' = |\<phi>|\<^sub>2`r"
-      by (auto intro: fst_fun snd_fun appI \<open>\<phi>: A \<succ> A\<close>)
-    thus False using * by auto
-  qed thus ?thesis ..
+lemma emptysetE: "x \<in> \<emptyset> \<Longrightarrow> False"
+proof (unfold emptyset_def)
+  fix r assume "r \<in> |emptyrel|"
+  hence
+    "|emptyrel|\<^sub>1`r \<in> set" and
+    "|emptyrel|\<^sub>2`r \<in> set" and
+    "\<exists>r' \<in> |emptyrel|. |emptyrel|\<^sub>1`r' = |emptyrel|\<^sub>1`r \<and> |emptyrel|\<^sub>2`r' = |emptyrel|\<^sub>2`r"
+    by (auto intro: fst_fun snd_fun appI)
+  thus False using tabulatesD1 tabulation by blast
 qed
-
-lemma singleton_ex: "\<exists>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
-proof -
-  obtain a A where "a \<in> A" using nonempty_ex by blast
-  obtain \<phi> where 1: "\<phi>: A \<succ> A" and 2: "\<forall>x \<in> A. \<forall>y \<in> A. (x \<phi> y) \<longleftrightarrow> x = a \<and> y = a"
-    using rel_comprehension[of A A "\<lambda>x y. x = a \<and> y = a"] by blast
-
-  hence 3: "\<forall>r \<in> |\<phi>|. |\<phi>|\<^sub>1`r = a \<and> |\<phi>|\<^sub>2`r = a"
-    by (auto intro: fst_fun snd_fun appI tabulation tab_holds)
-
-  obtain r where "r \<in> |\<phi>|" using 2 tabulatesD1[OF tabulation[OF 1], of a a] \<open>a \<in> A\<close> by auto
-  then have "\<forall>s \<in> |\<phi>|. r = s" using 3 tabulatesD2[OF tabulation[OF 1]] by auto
-
-  thus ?thesis using \<open>r \<in> |\<phi>|\<close> by auto
-qed
-
-text \<open>Fix particular choices of empty and singleton set.\<close>
-
-definition emptyset :: set ("\<emptyset>")
-  where "\<emptyset> \<equiv> some X. \<forall>x \<in> X. x \<notin> X"
-
-lemma emptysetI: "\<forall>x \<in> \<emptyset>. x \<notin> \<emptyset>"
-  unfolding emptyset_def using emptyset_ex some_setI[of "\<lambda>X. \<forall>x \<in> X. x \<notin> X"] by auto
 
 lemma vacuous: "\<forall>x \<in> \<emptyset>. P(x)"
-  using emptysetI by blast
+  using emptysetE by blast
 
+relation "singlerel: set \<succ> set" where "(x singlerel y) \<longleftrightarrow> x = elem \<and> y = elem"
 
-definition singleton :: set ("\<one>")
-  where "\<one> \<equiv> some X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
+definition singleton ("\<one>") where "\<one> \<equiv> |singlerel|"
 
-lemma singletonI: "\<exists>!x \<in> \<one>. \<forall>y \<in> \<one>. y = x"
-  unfolding singleton_def using singleton_ex some_setI[of "\<lambda>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"] by auto
+lemma singletonI: "\<exists>x \<in> \<one>. \<forall>y \<in> \<one>. y = x"
+proof (unfold singleton_def)
+  obtain r where "r \<in> |singlerel|"
+    using tabulatesD1 tabulation nontrivial by blast
+
+  have "\<forall>r \<in> |singlerel|. |singlerel|\<^sub>1`r = elem \<and> |singlerel|\<^sub>2`r = elem"
+    using singlerel_prop by (blast intro: fst_fun snd_fun appI tab_holds)
+
+  hence "\<forall>s \<in> |singlerel|. r = s"
+    using tabulatesD2 tabulation[OF singlerel_sort] \<open>r \<in> |singlerel|\<close> by auto
+
+  thus "\<exists>x \<in> |singlerel|. \<forall>y \<in> |singlerel|. y = x" using \<open>r \<in> |singlerel|\<close> by auto
+qed
+
+lemma singletonI': "\<exists>!x \<in> \<one>. \<forall>y \<in> \<one>. y = x"
+  using singletonI by auto
 
 lemma singleton_all_eq: "\<lbrakk>x \<in> \<one>; y \<in> \<one>\<rbrakk> \<Longrightarrow> x = y"
-  using singletonI by auto
+  using singletonI by blast
 
 definition pt :: elem
   where "pt \<equiv> the (x \<in> \<one>). \<forall>y \<in> \<one>. y = x"
 
 lemma ptI [intro]: "pt \<in> \<one>"
-  unfolding pt_def using singletonI the_elem_sort' by auto
+  unfolding pt_def using singletonI' the_elem_sort' by auto
 
 lemma singletonD: "x \<in> \<one> \<Longrightarrow> x = pt"
-  unfolding pt_def using the_elemI'[OF singletonI] by auto
+  unfolding pt_def using the_elemI'[OF singletonI'] by auto
 
 lemma singletonE [elim]: "\<lbrakk>x \<in> \<one>; P(pt)\<rbrakk> \<Longrightarrow> P(x)"
   using singletonD by auto
