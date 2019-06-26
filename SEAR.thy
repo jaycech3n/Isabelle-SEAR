@@ -666,20 +666,20 @@ let
 
       val fold_thm =
         let
-          (* `def_thm` is the definitional theorem for the defined relation and has the form
+          (* `def_thm` is the definitional lemma for the defined relation and has the form
              `\<phi> \<equiv> \<lambda>x1 ... xn. B`.
              Return `\<lambda>x1 ... xn. B`. *)
           val lambda = case (Thm.prop_of def_thm) of
               Const ("Pure.eq", _) $ _ $ rhs => rhs
             | _ => error "Not a definitional equation"
 
-          (* Theorem `\<phi> a1 ... an \<equiv> (\<lambda>x1 ... xn. B) a1 ... an` *)
+          (* Lemma `\<phi> a1 ... an \<equiv> (\<lambda>x1 ... xn. B) a1 ... an` *)
           val def_app_eq_thm =
             let val refl_thm = Thm.reflexive o Thm.cterm_of lthy in
               fold (fn th1 => fn th2 => Thm.combination th2 th1) (map refl_thm params) def_thm
             end
 
-          (* Theorem `(\<lambda>x1 ... xn. B) a1 ... an \<equiv> B[a1/x1, ..., an/xn]` *)
+          (* Lemma `(\<lambda>x1 ... xn. B) a1 ... an \<equiv> B[a1/x1, ..., an/xn]` *)
           val lambda_app_eq_thm =
             Thm.beta_conversion true (Thm.cterm_of lthy (Term.list_comb (lambda, params)))
         in
@@ -717,8 +717,8 @@ let
         generate_thms lthy' head params dom cod cond def_thm
       val defined_name = Term.term_name defined_tm
     in
-      writeln ("relation\n  " ^ defined_name ^ " :: " ^
-        (Syntax.string_of_typ lthy' (Term.type_of defined_tm)));
+      writeln ("relation\n  " ^ defined_name ^ " :: \"" ^
+        (Syntax.string_of_typ lthy' (Term.type_of defined_tm)) ^ "\"");
       Output.information ("lemma " ^ defined_name ^ "_sort:\n  " ^
         ((Pretty.string_of o Syntax.pretty_term lthy' o Thm.prop_of) sort_thm));
       Output.information ("lemma " ^ defined_name ^ "_prop:\n  " ^
@@ -746,7 +746,7 @@ qed
 
 section \<open>Empty and singleton sets\<close>
 
-theorem emptyset_ex: "\<exists>X. \<forall>x \<in> X. x \<notin> X"
+lemma emptyset_ex: "\<exists>X. \<forall>x \<in> X. x \<notin> X"
 proof -
   obtain \<phi> where "\<phi>: A \<succ> A" and "\<forall>x \<in> A. \<forall>y \<in> A. \<not>(x \<phi> y)"
     using rel_comprehension[of A A "\<lambda>_ _. False"] by blast
@@ -763,7 +763,7 @@ proof -
   qed thus ?thesis ..
 qed
 
-theorem singleton_ex: "\<exists>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
+lemma singleton_ex: "\<exists>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
 proof -
   obtain a A where "a \<in> A" using nonempty_ex by blast
   obtain \<phi> where 1: "\<phi>: A \<succ> A" and 2: "\<forall>x \<in> A. \<forall>y \<in> A. (x \<phi> y) \<longleftrightarrow> x = a \<and> y = a"
@@ -783,29 +783,42 @@ text \<open>Fix particular choices of empty and singleton set.\<close>
 definition emptyset :: set ("\<emptyset>")
   where "\<emptyset> \<equiv> some X. \<forall>x \<in> X. x \<notin> X"
 
-theorem emptysetI: "\<forall>x \<in> \<emptyset>. x \<notin> \<emptyset>"
+lemma emptysetI: "\<forall>x \<in> \<emptyset>. x \<notin> \<emptyset>"
   unfolding emptyset_def using emptyset_ex some_setI[of "\<lambda>X. \<forall>x \<in> X. x \<notin> X"] by auto
 
-theorem vacuous: "\<forall>x \<in> \<emptyset>. P(x)"
+lemma vacuous: "\<forall>x \<in> \<emptyset>. P(x)"
   using emptysetI by blast
+
 
 definition singleton :: set ("\<one>")
   where "\<one> \<equiv> some X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"
 
-theorem singletonI: "\<exists>x \<in> \<one>. \<forall>y \<in> \<one>. y = x"
+lemma singletonI: "\<exists>!x \<in> \<one>. \<forall>y \<in> \<one>. y = x"
   unfolding singleton_def using singleton_ex some_setI[of "\<lambda>X. \<exists>x \<in> X. \<forall>y \<in> X. y = x"] by auto
 
-lemma singleton_all_eq: "\<forall>x \<in> \<one>. \<forall>y \<in> \<one>. x = y"
-  using singletonI by blast
+lemma singleton_all_eq: "\<lbrakk>x \<in> \<one>; y \<in> \<one>\<rbrakk> \<Longrightarrow> x = y"
+  using singletonI by auto
+
+definition pt :: elem
+  where "pt \<equiv> the (x \<in> \<one>). \<forall>y \<in> \<one>. y = x"
+
+lemma ptI [intro]: "pt \<in> \<one>"
+  unfolding pt_def using singletonI the_elem_sort' by auto
+
+lemma singletonD: "x \<in> \<one> \<Longrightarrow> x = pt"
+  unfolding pt_def using the_elemI'[OF singletonI] by auto
+
+lemma singletonE [elim]: "\<lbrakk>x \<in> \<one>; P(pt)\<rbrakk> \<Longrightarrow> P(x)"
+  using singletonD by auto
+
 
 text \<open>The unique function into the singleton \<one>\<close>
 
 lemma singleton_terminal: "\<exists>!f: X \<succ> \<one>. f: X \<rightarrow> \<one>"
 proof (auto intro: fun_ext appI singleton_all_eq[rule_format])
-  obtain pt where "pt \<in> \<one>" using singletonI by auto
   obtain f where 1: "f: X \<succ> \<one>" and 2: "\<forall>x \<in> X. \<forall>y \<in> \<one>. (x f y) \<longleftrightarrow> y = pt"
     using rel_comprehension[of X \<one> "\<lambda>_ y. y = pt"] by blast
-  then have "f: X \<rightarrow> \<one>" unfolding fun_def using \<open>pt \<in> \<one>\<close> 2[rule_format] by auto
+  then have "f: X \<rightarrow> \<one>" unfolding fun_def using 2[rule_format] ptI by auto
   thus "\<exists>f: X \<succ> \<one>. f: X \<rightarrow> \<one>" using 1 by auto
 qed
 
@@ -824,11 +837,38 @@ section \<open>Subsets\<close>
 definition subset :: "[rel, set] \<Rightarrow> bool" (infix "\<subseteq>" 50)
   where "S \<subseteq> A \<equiv> S: \<one> \<succ> A"
 
-relation "empty_subset(X): \<one> \<succ> X" where "(a empty_subset x) \<longleftrightarrow> False"
-notation empty_subset ("\<emptyset>")
+definition elem_subset :: "[elem, rel] \<Rightarrow> bool" (infix "\<in>" 50)
+  where "a \<in> S \<equiv> pt S a"
 
-lemma "\<emptyset>(X) \<subseteq> X"
-unfolding subset_def by auto
+abbreviation not_elem_subset :: "[elem, rel] \<Rightarrow> bool" (infix "\<notin>" 50)
+  where "a \<notin> (S::rel) \<equiv> \<not> a \<in> S"
+
+\<comment>\<open>Lots of overloading; may have to fix this later.\<close>
+
+
+subsection \<open>Empty and improper subsets\<close>
+
+relation "emptysub(X): \<one> \<succ> X" where "(a emptysub x) \<longleftrightarrow> False"
+notation emptysub ("\<emptyset>")
+
+lemma emptysub_subsetI: "\<emptyset>(X) \<subseteq> X"
+  unfolding subset_def ..
+
+lemma emptysub_empty: "\<forall>x \<in> X. x \<notin> \<emptyset>(X)"
+  unfolding elem_subset_def by auto
+
+
+relation "impropersub(X): \<one> \<succ> X" where "(a impropersub x) \<longleftrightarrow> True"
+notation impropersub ("whole")
+
+lemma impropersub_subsetI: "whole(X) \<subseteq> X"
+  unfolding subset_def ..
+
+lemma impropersub_full: "\<forall>x \<in> X. x \<in> whole(X)"
+  unfolding elem_subset_def by auto
+
+
+\<comment>\<open>Work in progress!\<close>
 
 
 end
