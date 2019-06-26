@@ -589,7 +589,8 @@ corollary tab_holds: "\<lbrakk>\<phi>: A \<succ> B; r \<in> |\<phi>|\<rbrakk> \<
 section \<open>Relations\<close>
 
 text \<open>
-Functionality for defining relations by writing \<open>relation "\<phi>: A \<succ> B" where "a \<phi> b = P(a, b)"\<close>.
+Functionality for defining relations by writing
+  \<open>relation "\<phi>(x1, ..., xn): A \<succ> B" where "(a \<phi>(x1, ..., xn) b) \<longleftrightarrow> P(a, b)"\<close>.
 \<close>
 
 ML \<open>
@@ -601,35 +602,54 @@ let
       @{const "rel_of"} $ rel $ dom $ cod => (rel, dom, cod)
     | _ => error "Error parsing relation"
 
+  fun dest_param tm = case tm of
+      Const (name, typ) => (tm, name, typ)
+    | Free (name, typ) => (tm, name, typ)
+    | _ => error "Parameter not atomic"
+
   (* Process a definition of the form "(a \<phi> b) = P(a, b)" for a relation with
-     given domain and codomain.
-     Return a pair of terms which are used to define the relation and generated theorems. *)
+     given domain and codomain. *)
   fun process_def lthy rel dom cod prop = case prop of
-        @{const HOL.eq (bool)} $ (@{const "holds"} $ rel' $ var1 $ var2) $ cond =>
-          let
-            val _ = if not (rel aconv rel')
-              then error ("Not a definition for \"" ^ ((Pretty.string_of o Syntax.pretty_term lthy) rel) ^ "\"") else ""
+      @{const HOL.eq (bool)} $ (@{const "holds"} $ rel' $ var1 $ var2) $ cond =>
+        let
+          val _ =
+            if not (rel aconv rel')
+            then if Term.aconv_untyped (rel, rel')
+              then
+                error "Parameter type mismatch; annotate to fix"
+              else
+                error ("Not a definition for \"" ^
+                  ((Pretty.string_of o Syntax.pretty_term lthy) rel) ^ "\"")
+            else ()
+  
+          val (var1name, var2name) = apply2 Term.term_name (var1, var2)
+  
+          val def =
+            Abs ("\<phi>", @{typ "rel"}, Term.abstract_over (rel,
+              @{const "all_elem"} $ dom $
+                Abs (var1name, @{typ "elem"}, Term.abstract_over (var1,
+                  @{const "all_elem"} $ cod $
+                    Abs (var2name, @{typ "elem"}, Term.abstract_over (var2, prop))))))
+  
+          val cond' =
+            Abs (var1name, @{typ "elem"}, Term.abstract_over (var1,
+                Abs (var2name, @{typ "elem"}, Term.abstract_over (var2, cond))))
+  
+          val (rel_head, rel_params) = Term.strip_comb rel
+        in
+          (def, cond', rel_head, rel_params)
+        end
+    | _ => error "Definition not accepted"
 
-            val (var1name, var2name) = apply2 Term.term_name (var1, var2)
-
-            val def = Abs ("\<phi>", @{typ "rel"}, Term.abstract_over (rel,
-              @{const "all_elem"} $ dom $ Abs (var1name, @{typ "elem"},
-                Term.abstract_over (var1,
-                  @{const "all_elem"} $ cod $ Abs (var2name, @{typ "elem"},
-                    Term.abstract_over (var2, prop))))))
-
-            val cond' = Abs (var1name, @{typ "elem"},
-              Term.abstract_over (var1,
-                Abs (var2name, @{typ "elem"},
-                  Term.abstract_over (var2, cond))))
-          in
-            (def, cond')
-          end
-      | _ => error "Definition not accepted"
-
-  fun define_relation lthy rel_name dom cod def_tm =
+  fun define_relation lthy rel_head rel_params dom cod def_tm =
     let
-      val defined_tm = @{const "the_rel"} $ dom $ cod $ def_tm
+      val rel_name = Term.term_name rel_head
+
+      fun abstract ((param, name, typ), tm) = Abs (name, typ, Term.abstract_over (param, tm))
+
+      val params = map dest_param rel_params
+
+      val defined_tm = List.foldr abstract (@{const "the_rel"} $ dom $ cod $ def_tm) params
     in
       Local_Theory.define (
         (Binding.qualified_name rel_name, NoSyn),
@@ -637,20 +657,13 @@ let
       ) lthy
     end
 
-  fun gen_thms lthy rel_name dom cod rel_cond_tm rel_def_thm =
+  fun gen_thms lthy rel_name instantiations rel_def_thm =
     let
-      val (rel_prop_thm, rel_sort_thm) = apply2 (fn th =>
-        (Object_Logic.rulify lthy o Local_Defs.fold lthy [rel_def_thm]) (
-          th OF [Thm.instantiate
-            ( [],
-              [
-                ((("A", 0), @{typ set}), Thm.cterm_of lthy dom),
-                ((("B", 0), @{typ set}), Thm.cterm_of lthy cod),
-                ((("P", 0), @{typ "elem \<Rightarrow> elem \<Rightarrow> bool"}), Thm.cterm_of lthy rel_cond_tm)
-              ] )
-            @{thm rel_comprehension}
-          ])
-        ) (@{thm the_relI'}, @{thm the_rel_sort'})
+      val (rel_prop_thm, rel_sort_thm) =
+        apply2
+          (fn th => (Object_Logic.rulify lthy o Local_Defs.fold lthy [rel_def_thm])
+            (th OF [Thm.instantiate ([], instantiations) @{thm rel_comprehension}]))
+          (@{thm the_relI'}, @{thm the_rel_sort'})
     in
       lthy |>
         Local_Theory.notes [
@@ -665,12 +678,30 @@ let
     let
       val (rel, dom, cod) = dest_rel_term (Syntax.read_term lthy relstr)
 
-      val _ = (@{print} rel; @{print} dom; @{print} cod)
+      val (rel_def, rel_cond, rel_head, rel_params) =
+        process_def lthy rel dom cod (Syntax.read_term lthy defstr)
 
-      val rel_name = Term.term_name rel
-      val (rel_def, rel_cond) = process_def lthy rel dom cod (Syntax.read_term lthy defstr)
-      val ((defined_rel, (_, rel_def_thm)), lthy) = define_relation lthy rel_name dom cod rel_def
-      val ((_, sort_thm::_)::(_, prop_thm::_)::_, lthy') = gen_thms lthy rel_name dom cod rel_cond rel_def_thm
+      val rel_name = Term.term_name rel_head
+
+      val ((defined_rel, (_, rel_def_thm)), lthy') =
+        define_relation lthy rel_head rel_params dom cod rel_def
+
+      val instantiations =
+        let
+          val subst_dom = if member (op aconv) rel_params dom
+            then [] else [((("A", 0), @{typ set}), Thm.cterm_of lthy dom)]
+
+          val subst_cod = if member (op aconv) rel_params cod
+            then [] else [((("B", 0), @{typ set}), Thm.cterm_of lthy cod)]
+        in
+          ((("P", 0), @{typ "elem \<Rightarrow> elem \<Rightarrow> bool"}), Thm.cterm_of lthy rel_cond) ::
+            (subst_dom @ subst_cod)
+        end
+
+      val _ = @{print} instantiations
+
+      val ((_, sort_thm :: _) :: (_, prop_thm :: _) :: _, lthy'') =
+        gen_thms lthy' rel_name instantiations rel_def_thm
     in
       writeln ("relation\n  " ^ (Term.term_name defined_rel) ^ " :: " ^
         (Syntax.string_of_typ lthy' (Term.type_of defined_rel)));
@@ -678,14 +709,29 @@ let
         ((Pretty.string_of o Syntax.pretty_term lthy' o Thm.prop_of) sort_thm));
       Output.information ("lemma " ^ rel_name ^ "_prop:\n  " ^
         ((Pretty.string_of o Syntax.pretty_term lthy' o Thm.prop_of) prop_thm));
-      lthy'
+
+      lthy''
     end
 in
   parser >> relation_cmd
 end
 \<close>
 
-relation "\<phi>(A, B): A \<succ> B" where "(a \<phi>(A) b) \<longleftrightarrow> a \<in> A \<and> b \<in> B"
+relation "\<phi>(A, B, C :: rel): A \<succ> B" where "(a \<phi>(A :: set, B::set, C ::rel) b) \<longleftrightarrow> (a = b) \<and> (a C b)"
+
+thm \<phi>_def
+thm \<phi>_sort
+thm \<phi>_prop
+print_claset
+
+lemma int: "\<phi>(A, B) \<equiv> (the (\<phi>: A \<succ> B). \<forall>a \<in> A. \<forall>b \<in> B. (a \<phi> b) = (a = b))"
+  unfolding \<phi>_def by auto
+
+thm the_relI'[
+  OF rel_comprehension[of _ _ "\<lambda>a b. a = b"],
+  folded int,
+  rule_format
+]
 
 
 section \<open>Basic definitions and results\<close>
@@ -783,11 +829,12 @@ subsection \<open>Subsets\<close>
 definition subset :: "[rel, set] \<Rightarrow> bool" (infix "\<subseteq>" 50)
   where "S \<subseteq> A \<equiv> S: \<one> \<succ> A"
 
-relation "test: \<one> \<succ> \<emptyset>" where "(a test b) = (a = b)"
+relation "empty_subset(X): \<one> \<succ> X"
+  where "(a empty_subset(X::set) x) \<longleftrightarrow> False"
 
-relation "empty(X): \<one> \<succ> X" where "(a empty(X) x) \<longleftrightarrow> False"
-
-
+thm empty_subset_def
+thm empty_subset_sort
+thm empty_subset_prop
 
 
 end
