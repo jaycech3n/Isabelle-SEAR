@@ -793,22 +793,13 @@ lemma singletonE [elim]: "\<lbrakk>x \<in> \<one>; P(pt)\<rbrakk> \<Longrightarr
 
 text \<open>The unique function into the singleton \<one>\<close>
 
-lemma singleton_terminal: "\<exists>!f: X \<succ> \<one>. f: X \<rightarrow> \<one>"
-proof (auto intro: fun_ext appI singleton_all_eq[rule_format])
-  obtain f where 1: "f: X \<succ> \<one>" and 2: "\<forall>x \<in> X. \<forall>y \<in> \<one>. (x f y) \<longleftrightarrow> y = pt"
-    using rel_comprehension[of X \<one> "\<lambda>_ y. y = pt"] by blast
-  then have "f: X \<rightarrow> \<one>" unfolding fun_def using 2[rule_format] ptI by auto
-  thus "\<exists>f: X \<succ> \<one>. f: X \<rightarrow> \<one>" using 1 by auto
-qed
+relation "terminal(X): X \<succ> \<one>" where "(x terminal y) \<longleftrightarrow> y = pt"
 
-definition terminal :: "set \<Rightarrow> rel" ("(terminal\<^bsub>_\<^esub>)")
-  where "terminal\<^bsub>X\<^esub> \<equiv> the (f: X \<succ> \<one>). f: X \<rightarrow> \<one>"
+lemma terminal_fun: "terminal(X): X \<rightarrow> \<one>"
+  unfolding fun_def by auto
 
-lemma terminal_welldef: "terminal\<^bsub>X\<^esub>: X \<rightarrow> \<one>"
-  unfolding terminal_def using singleton_terminal the_relI'[where ?P="\<lambda>f. f: X \<rightarrow> \<one>"] by auto
-
-lemma terminal_constant: "\<forall>x \<in> X. \<forall>y \<in> X. terminal\<^bsub>X\<^esub>`x = terminal\<^bsub>X\<^esub>`y"
-  using terminal_welldef appI singleton_all_eq by blast
+lemma terminal_constant: "\<forall>x \<in> X. \<forall>y \<in> X. (terminal(X)`x) = terminal(X)`y"
+  using terminal_fun appI singleton_all_eq by blast
 
 
 section \<open>Subsets\<close>
